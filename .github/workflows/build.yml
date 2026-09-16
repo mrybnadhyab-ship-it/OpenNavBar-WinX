@@ -17,4 +17,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Patch OpenNavBar
+        run: python3 patch_opennavbar.py
+
+      - name: Build APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenNavBar-WinX-APK
+          path: |
+            app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
