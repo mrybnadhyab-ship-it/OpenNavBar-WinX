@@ -12,75 +12,127 @@ with open(path, "r", encoding="utf-8") as f:
 
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
-# 1. Add WinX state variable
-if "private var isWinXLauncher" not in code:
-    marker = "class NavigationOverlayService"
-    pos = code.find(marker)
+# ============================================================
+# 1. Add WinX state
+# ============================================================
 
-    if pos == -1:
-        raise RuntimeError("NavigationOverlayService class not found")
+if "WINX_PATCH_STATE" not in code:
 
-    brace = code.find("{", pos)
-
-    if brace == -1:
-        raise RuntimeError("Class opening brace not found")
-
-    code = (
-        code[:brace + 1]
-        + "\n\n    private var isWinXLauncher = false\n"
-        + code[brace + 1:]
+    match = re.search(
+        r"(class\s+NavigationOverlayService[^{]*\{)",
+        code
     )
 
-# 2. Prevent overlay from appearing while WinX is active
-for method in ["showOverlay()", "showOverlayAnimated()"]:
-    pattern = r"(fun\s+" + re.escape(method[:-2]) + r"\s*\([^)]*\)\s*\{)"
-    match = re.search(pattern, code)
+    if not match:
+        raise RuntimeError(
+            "Could not find NavigationOverlayService class"
+        )
 
-    if match:
-        start = match.end()
-        section = code[start:start + 250]
+    insert_pos = match.end()
 
-        if "isWinXLauncher" not in section:
-            code = (
-                code[:start]
-                + "\n        if (isWinXLauncher) return\n"
-                + code[start:]
-            )
+    code = (
+        code[:insert_pos]
+        + """
 
-# 3. Detect WinX from accessibility events
-if "TYPE_WINDOW_STATE_CHANGED" in code:
+    // WINX_PATCH_STATE
+    private var isWinXLauncher = false
+    // WINX_PATCH_STATE_END
 
-    detection = '''
-        val packageName = event.packageName?.toString() ?: ""
+"""
+        + code[insert_pos:]
+    )
 
-        val nowWinX = packageName == "''' + WINX_PACKAGE + '''"
 
-        if (nowWinX != isWinXLauncher) {
-            isWinXLauncher = nowWinX
+# ============================================================
+# 2. Find ANY function receiving AccessibilityEvent
+# ============================================================
 
-            if (isWinXLauncher) {
-                hideOverlay()
-            } else {
-                showOverlay()
-            }
-        }
+if "WINX_PATCH_EVENT" not in code:
 
-'''
+    event_match = re.search(
+        r"(fun\s+\w+\s*\([^)]*AccessibilityEvent[^)]*\)\s*\{)",
+        code
+    )
 
-    # Insert once into onAccessibilityEvent
-    event_pattern = r"(override\s+fun\s+onAccessibilityEvent\s*\(\s*event\s*:\s*AccessibilityEvent\s*\)\s*\{)"
+    if not event_match:
 
-    match = re.search(event_pattern, code)
+        # Try functions where event is typed indirectly
+        event_match = re.search(
+            r"(fun\s+\w+\s*\([^)]*\bevent\b[^)]*\)\s*\{)",
+            code
+        )
+
+    if not event_match:
+        raise RuntimeError(
+            "Could not find Accessibility event handler"
+        )
+
+    insert_pos = event_match.end()
+
+    patch = f"""
+
+        // WINX_PATCH_EVENT
+        val winXActive =
+            event.packageName?.toString() == "{WINX_PACKAGE}"
+
+        if (winXActive && !isWinXLauncher) {{
+            isWinXLauncher = true
+            hideOverlay()
+        }} else if (!winXActive && isWinXLauncher) {{
+            isWinXLauncher = false
+            showOverlay()
+        }}
+        // WINX_PATCH_EVENT_END
+
+"""
+
+    code = code[:insert_pos] + patch + code[insert_pos:]
+
+
+# ============================================================
+# 3. Protect overlay showing
+# ============================================================
+
+# Patch function bodies only, NOT function declarations.
+
+def protect_function(function_name):
+    global code
+
+    pattern = re.compile(
+        r"(fun\s+" + re.escape(function_name) +
+        r"\s*\([^)]*\)\s*\{)"
+    )
+
+    match = pattern.search(code)
 
     if not match:
-        raise RuntimeError("onAccessibilityEvent not found")
+        return
 
-    start = match.end()
+    body_start = match.end()
 
-    if "val nowWinX = packageName" not in code:
-        code = code[:start] + "\n" + detection + code[start:]
+    check_area = code[body_start:body_start + 300]
+
+    if "isWinXLauncher" not in check_area:
+
+        code = (
+            code[:body_start]
+            + "\n        if (isWinXLauncher) return\n"
+            + code[body_start:]
+        )
+
+
+protect_function("showOverlay")
+protect_function("showOverlayAnimated")
+
+
+# ============================================================
+# 4. Save
+# ============================================================
 
 with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
-print("WinX patch applied successfully.")
+print("======================================")
+print("WinX patch applied successfully")
+print("WinX package:", WINX_PACKAGE)
+print("======================================")
