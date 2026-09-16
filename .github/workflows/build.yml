@@ -8,21 +8,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout official OpenNavBar source
-        uses: actions/checkout@v4
-        with:
-          repository: ItsZariep/OpenNavBar
-          ref: main
-          path: opennavbar
+      - name: Checkout OpenNavBar
+        run: |
+          git clone https://codeberg.org/ItsZariep/OpenNavBar.git opennavbar
 
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Apply Win X auto-hide modification
-        run: python3 patch_opennavbar.py opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
 
       - name: Build debug APK
         working-directory: opennavbar
