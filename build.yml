@@ -1,32 +1,57 @@
-name: Build OpenNavBar WinX edition
+name: Build OpenNavBar WinX
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout official OpenNavBar source
-        uses: actions/checkout@v4
-        with:
-          repository: ItsZariep/OpenNavBar
-          ref: main
-          path: opennavbar
 
-      - name: Set up JDK
+    steps:
+      - name: Checkout WinX project
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Apply Win X auto-hide modification
-        run: python3 patch_opennavbar.py opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: Build debug APK
+      - name: Clone OpenNavBar source
+        run: |
+          git clone https://codeberg.org/ItsZariep/OpenNavBar.git opennavbar
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Create Gradle Wrapper
         working-directory: opennavbar
         run: |
+          gradle wrapper --gradle-version 8.13
           chmod +x gradlew
+
+      - name: Check OpenNavBar source
+        run: |
+          test -f opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
+          echo "NavigationOverlayService.kt found"
+
+      - name: Apply WinX patch
+        run: |
+          python3 patch_opennavbar.py opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
+
+      - name: Build APK
+        working-directory: opennavbar
+        run: |
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
@@ -34,3 +59,4 @@ jobs:
         with:
           name: OpenNavBar-WinX-debug
           path: opennavbar/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
