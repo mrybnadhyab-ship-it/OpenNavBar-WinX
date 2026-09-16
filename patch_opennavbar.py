@@ -12,9 +12,9 @@ with open(path, "r", encoding="utf-8") as f:
 
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
-# ============================================================
+# --------------------------------------------------
 # 1. Add WinX state
-# ============================================================
+# --------------------------------------------------
 
 if "WINX_PATCH_STATE" not in code:
 
@@ -24,14 +24,10 @@ if "WINX_PATCH_STATE" not in code:
     )
 
     if not match:
-        raise RuntimeError(
-            "Could not find NavigationOverlayService class"
-        )
-
-    insert_pos = match.end()
+        raise RuntimeError("NavigationOverlayService class not found")
 
     code = (
-        code[:insert_pos]
+        code[:match.end()]
         + """
 
     // WINX_PATCH_STATE
@@ -39,41 +35,41 @@ if "WINX_PATCH_STATE" not in code:
     // WINX_PATCH_STATE_END
 
 """
-        + code[insert_pos:]
+        + code[match.end():]
     )
 
-
-# ============================================================
-# 2. Find ANY function receiving AccessibilityEvent
-# ============================================================
+# --------------------------------------------------
+# 2. Find AccessibilityEvent handler
+# --------------------------------------------------
 
 if "WINX_PATCH_EVENT" not in code:
 
-    event_match = re.search(
+    match = re.search(
         r"(fun\s+\w+\s*\([^)]*AccessibilityEvent[^)]*\)\s*\{)",
         code
     )
 
-    if not event_match:
+    if not match:
+        raise RuntimeError("AccessibilityEvent handler not found")
 
-        # Try functions where event is typed indirectly
-        event_match = re.search(
-            r"(fun\s+\w+\s*\([^)]*\bevent\b[^)]*\)\s*\{)",
-            code
-        )
+    # Get the actual parameter name
+    signature = match.group(1)
 
-    if not event_match:
-        raise RuntimeError(
-            "Could not find Accessibility event handler"
-        )
+    param_match = re.search(
+        r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*AccessibilityEvent",
+        signature
+    )
 
-    insert_pos = event_match.end()
+    if not param_match:
+        raise RuntimeError("Could not determine AccessibilityEvent parameter")
+
+    event_var = param_match.group(1)
 
     patch = f"""
 
         // WINX_PATCH_EVENT
         val winXActive =
-            event.packageName?.toString() == "{WINX_PACKAGE}"
+            {event_var}?.packageName?.toString() == "{WINX_PACKAGE}"
 
         if (winXActive && !isWinXLauncher) {{
             isWinXLauncher = true
@@ -86,20 +82,17 @@ if "WINX_PATCH_EVENT" not in code:
 
 """
 
-    code = code[:insert_pos] + patch + code[insert_pos:]
+    code = code[:match.end()] + patch + code[match.end():]
 
+# --------------------------------------------------
+# 3. Protect showOverlay
+# --------------------------------------------------
 
-# ============================================================
-# 3. Protect overlay showing
-# ============================================================
-
-# Patch function bodies only, NOT function declarations.
-
-def protect_function(function_name):
+def protect_function(name):
     global code
 
     pattern = re.compile(
-        r"(fun\s+" + re.escape(function_name) +
+        r"(fun\s+" + re.escape(name) +
         r"\s*\([^)]*\)\s*\{)"
     )
 
@@ -108,31 +101,27 @@ def protect_function(function_name):
     if not match:
         return
 
-    body_start = match.end()
+    start = match.end()
+    area = code[start:start + 300]
 
-    check_area = code[body_start:body_start + 300]
-
-    if "isWinXLauncher" not in check_area:
-
+    if "if (isWinXLauncher) return" not in area:
         code = (
-            code[:body_start]
+            code[:start]
             + "\n        if (isWinXLauncher) return\n"
-            + code[body_start:]
+            + code[start:]
         )
-
 
 protect_function("showOverlay")
 protect_function("showOverlayAnimated")
 
-
-# ============================================================
+# --------------------------------------------------
 # 4. Save
-# ============================================================
+# --------------------------------------------------
 
 with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
 print("======================================")
 print("WinX patch applied successfully")
-print("WinX package:", WINX_PACKAGE)
+print("AccessibilityEvent nullable fix applied")
 print("======================================")
