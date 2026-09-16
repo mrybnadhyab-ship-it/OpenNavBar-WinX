@@ -918,4 +918,186 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
                             ) {
 
                                 autoHideRunnable?.let {
-              
+                                    handler.removeCallbacks(it)
+                                }
+
+                                autoHideRunnable =
+                                    Runnable {
+                                        hideOverlay()
+                                    }
+
+                                handler.postDelayed(
+                                    autoHideRunnable!!,
+                                    prefs.getInt(
+                                        "auto_hide_delay",
+                                        3000
+                                    ).toLong()
+                                )
+                            }
+                        }
+
+                        true
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        true
+                    }
+
+                    else -> {
+                        true
+                    }
+                }
+            }
+        }
+
+    revealZoneView =
+        zone
+
+    val params =
+        WindowManager.LayoutParams(
+
+            if (isVerticalBar)
+                zoneThickness
+            else
+                WindowManager.LayoutParams.MATCH_PARENT,
+
+            if (isVerticalBar)
+                WindowManager.LayoutParams.MATCH_PARENT
+            else
+                zoneThickness,
+
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+
+            PixelFormat.TRANSLUCENT
+        )
+
+    params.gravity =
+        when (position) {
+
+            "left" ->
+                Gravity.START
+
+            "right" ->
+                Gravity.END
+
+            else ->
+                Gravity.BOTTOM
+        }
+
+    /*
+     * Touchable only while hidden.
+     */
+    if (!isHidden) {
+
+        params.flags =
+            params.flags or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+    }
+
+    windowManager.addView(
+        revealZoneView,
+        params
+    )
+
+    // WINX_REVEAL_ZONE_PATCH_END
+}
+
+"""
+
+    code = (
+        code[:match.start()]
+        + replacement
+        + code[match.end():]
+    )
+
+
+# ============================================================
+# 10. CLEAN CLOCK ON DESTROY
+# ============================================================
+
+if "WINX_CLOCK_DESTROY_PATCH" not in code:
+
+    marker = "override fun onDestroy() {"
+
+    if marker in code:
+
+        code = code.replace(
+            marker,
+            """override fun onDestroy() {
+
+        // WINX_CLOCK_DESTROY_PATCH
+
+        handler.removeCallbacks(
+            winXClockRunnable
+        )
+
+        winXClockTextView = null
+
+        winXDateTextView = null
+
+        winXClockStarted = false
+
+        // WINX_CLOCK_DESTROY_PATCH_END
+""",
+            1
+        )
+
+
+# ============================================================
+# 11. SAVE
+# ============================================================
+
+with open(
+    path,
+    "w",
+    encoding="utf-8"
+) as f:
+
+    f.write(code)
+
+
+print("==============================================")
+print("WIN X STABLE + CLOCK + DATE + EDGE + SWIPE")
+print("==============================================")
+print("")
+print("LAYOUT:")
+print("Back -> edge")
+print("Home")
+print("Flexible space")
+print("Clock + Date")
+print("Recent Apps -> opposite edge")
+print("")
+print("CLOCK:")
+print("13sp / Bold")
+print("12-hour")
+print("ص / م")
+print("")
+print("DATE:")
+print("8sp / Normal")
+print("yyyy/MM/dd")
+print("")
+print("CLOCK WIDTH:")
+print("50dp")
+print("")
+print("CLOCK -> RECENT GAP:")
+print("0dp")
+print("")
+print("VERTICAL BAR:")
+print("Clock + Date rotate")
+print("")
+print("WIN X:")
+print("Hidden")
+print("")
+print("REVEAL:")
+print("Swipe enabled")
+print("")
+print("OUTSIDE WIN X:")
+print("Force show")
+print("")
+print("No app slots")
+print("No button logic changes")
+print("==============================================")
