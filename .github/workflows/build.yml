@@ -18,13 +18,3 @@ jobs:
           java-version: '17'
 
       - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenNavBar-WinX-debug
-          path: app/build/outputs/apk/debug/*.apk
