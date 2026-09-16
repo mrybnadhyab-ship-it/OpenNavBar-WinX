@@ -12,9 +12,9 @@ with open(path, "r", encoding="utf-8") as f:
 
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
-# --------------------------------------------------
-# 1. Add WinX state
-# --------------------------------------------------
+# ============================================================
+# 1. Add WinX state variable
+# ============================================================
 
 if "WINX_PATCH_STATE" not in code:
 
@@ -38,9 +38,9 @@ if "WINX_PATCH_STATE" not in code:
         + code[match.end():]
     )
 
-# --------------------------------------------------
+# ============================================================
 # 2. Find AccessibilityEvent handler
-# --------------------------------------------------
+# ============================================================
 
 if "WINX_PATCH_EVENT" not in code:
 
@@ -52,7 +52,6 @@ if "WINX_PATCH_EVENT" not in code:
     if not match:
         raise RuntimeError("AccessibilityEvent handler not found")
 
-    # Get the actual parameter name
     signature = match.group(1)
 
     param_match = re.search(
@@ -61,34 +60,45 @@ if "WINX_PATCH_EVENT" not in code:
     )
 
     if not param_match:
-        raise RuntimeError("Could not determine AccessibilityEvent parameter")
+        raise RuntimeError(
+            "Could not determine AccessibilityEvent parameter"
+        )
 
     event_var = param_match.group(1)
 
     patch = f"""
 
         // WINX_PATCH_EVENT
-        val winXActive =
-            {event_var}?.packageName?.toString() == "{WINX_PACKAGE}"
+        val currentPackage =
+            {event_var}?.packageName?.toString() ?: ""
 
-        if (winXActive && !isWinXLauncher) {{
-            isWinXLauncher = true
-            hideOverlay()
-        }} else if (!winXActive && isWinXLauncher) {{
-            isWinXLauncher = false
-            showOverlay()
+        if (currentPackage == "{WINX_PACKAGE}") {{
+
+            if (!isWinXLauncher) {{
+                isWinXLauncher = true
+                hideOverlay()
+            }}
+
+        }} else {{
+
+            if (isWinXLauncher) {{
+                isWinXLauncher = false
+                showOverlay()
+            }}
         }}
+
         // WINX_PATCH_EVENT_END
 
 """
 
     code = code[:match.end()] + patch + code[match.end():]
 
-# --------------------------------------------------
-# 3. Protect showOverlay
-# --------------------------------------------------
+# ============================================================
+# 3. Block overlay while WinX is active
+# ============================================================
 
 def protect_function(name):
+
     global code
 
     pattern = re.compile(
@@ -102,26 +112,28 @@ def protect_function(name):
         return
 
     start = match.end()
-    area = code[start:start + 300]
 
-    if "if (isWinXLauncher) return" not in area:
+    section = code[start:start + 300]
+
+    if "if (isWinXLauncher) return" not in section:
+
         code = (
             code[:start]
             + "\n        if (isWinXLauncher) return\n"
             + code[start:]
         )
 
+
 protect_function("showOverlay")
 protect_function("showOverlayAnimated")
 
-# --------------------------------------------------
+# ============================================================
 # 4. Save
-# --------------------------------------------------
+# ============================================================
 
 with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
 print("======================================")
-print("WinX patch applied successfully")
-print("AccessibilityEvent nullable fix applied")
+print("WinX automatic hide/show patch applied")
 print("======================================")
