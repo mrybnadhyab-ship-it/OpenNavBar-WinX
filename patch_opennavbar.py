@@ -14,30 +14,29 @@ WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
 
 # ============================================================
-# 1. Add required imports
+# 1. Add clock imports
 # ============================================================
 
-imports = [
-    "import android.app.AlertDialog",
-    "import android.content.pm.PackageManager",
+clock_imports = [
     "import android.graphics.Typeface",
-    "import android.graphics.drawable.GradientDrawable",
     "import android.widget.TextView",
     "import java.text.SimpleDateFormat",
     "import java.util.Date",
     "import java.util.Locale",
 ]
 
-for imp in imports:
+anchor = "import android.accessibilityservice.AccessibilityService"
+
+for imp in clock_imports:
     if imp not in code:
         code = code.replace(
-            "import android.accessibilityservice.AccessibilityService",
-            "import android.accessibilityservice.AccessibilityService\n" + imp
+            anchor,
+            anchor + "\n" + imp
         )
 
 
 # ============================================================
-# 2. Add WinX state + stable foreground check
+# 2. Add WinX stable hide/show
 # ============================================================
 
 if "WINX_STABLE_PATCH" not in code:
@@ -48,7 +47,9 @@ if "WINX_STABLE_PATCH" not in code:
     )
 
     if not match:
-        raise RuntimeError("NavigationOverlayService class not found")
+        raise RuntimeError(
+            "NavigationOverlayService class not found"
+        )
 
     insert = """
 
@@ -74,11 +75,14 @@ if "WINX_STABLE_PATCH" not in code:
 
         winXCheckRunnable = Runnable {
 
-            val currentPackage = getCurrentForegroundPackage()
+            val currentPackage =
+                getCurrentForegroundPackage()
 
-            if (currentPackage == "com.InternityLabs.Launcher.WinX") {
+            if (
+                currentPackage ==
+                "com.InternityLabs.Launcher.WinX"
+            ) {
 
-                // We are really inside Win X
                 if (!isWinXLauncher) {
 
                     isWinXLauncher = true
@@ -100,7 +104,6 @@ if "WINX_STABLE_PATCH" not in code:
 
             } else {
 
-                // Only restore if Win X was previously active.
                 if (isWinXLauncher) {
 
                     isWinXLauncher = false
@@ -110,24 +113,25 @@ if "WINX_STABLE_PATCH" not in code:
             }
         }
 
-        handler.postDelayed(winXCheckRunnable!!, 250)
+        handler.postDelayed(
+            winXCheckRunnable!!,
+            250
+        )
     }
+
 
     private fun forceShowAfterWinX() {
 
         val view = overlayView ?: return
 
-        // Cancel any running animation
         view.animate().cancel()
 
-        // Cancel automatic hide
         autoHideRunnable?.let {
             handler.removeCallbacks(it)
         }
 
         autoHideRunnable = null
 
-        // Restore overlay immediately
         view.visibility = View.VISIBLE
         view.alpha = 1f
         view.translationX = 0f
@@ -143,7 +147,11 @@ if "WINX_STABLE_PATCH" not in code:
 
 """
 
-    code = code[:match.end()] + insert + code[match.end():]
+    code = (
+        code[:match.end()]
+        + insert
+        + code[match.end():]
+    )
 
 
 # ============================================================
@@ -153,13 +161,14 @@ if "WINX_STABLE_PATCH" not in code:
 if "WINX_STABLE_EVENT_PATCH" not in code:
 
     match = re.search(
-        r"(override\s+fun\s+onAccessibilityEvent\s*\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)",
+        r"(override\s+fun\s+onAccessibilityEvent\s*"
+        r"\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)",
         code
     )
 
     if not match:
         raise RuntimeError(
-            "onAccessibilityEvent(AccessibilityEvent?) not found"
+            "onAccessibilityEvent not found"
         )
 
     patch = """
@@ -172,11 +181,15 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
 
 """
 
-    code = code[:match.end()] + patch + code[match.end():]
+    code = (
+        code[:match.end()]
+        + patch
+        + code[match.end():]
+    )
 
 
 # ============================================================
-# 4. Protect normal show functions
+# 4. Protect show functions
 # ============================================================
 
 def protect_function(name):
@@ -184,18 +197,25 @@ def protect_function(name):
     global code
 
     pattern = re.compile(
-        r"(fun\s+" + re.escape(name) +
+        r"(fun\s+" +
+        re.escape(name) +
         r"\s*\([^)]*\)\s*\{)"
     )
 
     match = pattern.search(code)
 
     if not match:
-        print("Warning: function not found:", name)
+        print(
+            "Warning: function not found:",
+            name
+        )
         return
 
     start = match.end()
-    section = code[start:start + 600]
+
+    section = code[
+        start:start + 600
+    ]
 
     if "if (isWinXLauncher) return" not in section:
 
@@ -215,564 +235,130 @@ protect_function("showOverlayAnimated")
 
 
 # ============================================================
-# 5. Add WinX apps + digital clock system
+# 5. Digital clock
 # ============================================================
 
-if "WINX_APPS_CLOCK_PATCH" not in code:
+if "WINX_CLOCK_ONLY_PATCH" not in code:
 
-    marker = re.search(
+    match = re.search(
         r"(class\s+NavigationOverlayService[^{]*\{)",
         code
     )
 
-    if not marker:
+    if not match:
         raise RuntimeError(
             "NavigationOverlayService class not found"
         )
 
-    extra = """
+    clock_code = """
 
-    // WINX_APPS_CLOCK_PATCH
+    // WINX_CLOCK_ONLY_PATCH
 
     private var winXClockTextView: TextView? = null
 
     private var winXClockStarted = false
 
-    private val winXClockRunnable = object : Runnable {
-        override fun run() {
+    private val winXClockRunnable =
+        object : Runnable {
 
-            try {
-                winXClockTextView?.text =
-                    SimpleDateFormat(
-                        "HH:mm",
-                        Locale.getDefault()
-                    ).format(Date())
-            } catch (_: Exception) {
-            }
-
-            handler.postDelayed(this, 1000)
-        }
-    }
-
-
-    private fun startWinXClock() {
-
-        if (!winXClockStarted) {
-
-            winXClockStarted = true
-
-            handler.removeCallbacks(winXClockRunnable)
-
-            handler.post(winXClockRunnable)
-        }
-    }
-
-
-    private fun getWinXAppPackage(slot: Int): String {
-
-        return prefs.getString(
-            "winx_app_$slot",
-            ""
-        ) ?: ""
-    }
-
-
-    private fun saveWinXAppPackage(
-        slot: Int,
-        packageName: String
-    ) {
-
-        prefs.edit()
-            .putString(
-                "winx_app_$slot",
-                packageName
-            )
-            .apply()
-    }
-
-
-    private fun getWinXAppShape(slot: Int): String {
-
-        return prefs.getString(
-            "winx_app_shape_$slot",
-            "rounded"
-        ) ?: "rounded"
-    }
-
-
-    private fun cycleWinXAppShape(slot: Int) {
-
-        val current = getWinXAppShape(slot)
-
-        val next = when (current) {
-
-            "circle" -> "rounded"
-
-            "rounded" -> "square"
-
-            "square" -> "sharp"
-
-            else -> "circle"
-        }
-
-        prefs.edit()
-            .putString(
-                "winx_app_shape_$slot",
-                next
-            )
-            .apply()
-
-        updateOverlayLive()
-    }
-
-
-    private fun createWinXAppButton(
-        slot: Int,
-        hitboxSize: Int,
-        buttonColor: Int
-    ): FrameLayout {
-
-        val frame = FrameLayout(this)
-
-        frame.isClickable = true
-        frame.isFocusable = true
-
-        val icon = ImageView(this)
-
-        val size = dpToPx(36)
-
-        val iconParams = FrameLayout.LayoutParams(
-            size,
-            size
-        )
-
-        iconParams.gravity = Gravity.CENTER
-
-        icon.layoutParams = iconParams
-
-        val packageName = getWinXAppPackage(slot)
-
-        if (packageName.isNotEmpty()) {
-
-            try {
-
-                val appIcon =
-                    packageManager.getApplicationIcon(
-                        packageName
-                    )
-
-                icon.setImageDrawable(appIcon)
-
-            } catch (_: Exception) {
-
-                icon.setImageResource(
-                    android.R.drawable.sym_def_app_icon
-                )
-            }
-
-        } else {
-
-            icon.setImageResource(
-                android.R.drawable.ic_input_add
-            )
-
-            icon.alpha = 0.55f
-        }
-
-
-        val shape = getWinXAppShape(slot)
-
-        val drawable = GradientDrawable()
-
-        when (shape) {
-
-            "circle" -> {
-
-                drawable.shape =
-                    GradientDrawable.OVAL
-            }
-
-            "square" -> {
-
-                drawable.shape =
-                    GradientDrawable.RECTANGLE
-
-                drawable.cornerRadius =
-                    dpToPx(6).toFloat()
-            }
-
-            "sharp" -> {
-
-                drawable.shape =
-                    GradientDrawable.RECTANGLE
-
-                drawable.cornerRadius = 0f
-            }
-
-            else -> {
-
-                drawable.shape =
-                    GradientDrawable.RECTANGLE
-
-                drawable.cornerRadius =
-                    dpToPx(12).toFloat()
-            }
-        }
-
-        drawable.setColor(
-            Color.TRANSPARENT
-        )
-
-        drawable.setStroke(
-            dpToPx(1),
-            buttonColor
-        )
-
-        icon.background = drawable
-        icon.clipToOutline = true
-
-        frame.addView(icon)
-
-
-        frame.setOnClickListener {
-
-            val selectedPackage =
-                getWinXAppPackage(slot)
-
-            if (selectedPackage.isEmpty()) {
-
-                showWinXAppPicker(slot)
-
-            } else {
+            override fun run() {
 
                 try {
 
-                    val intent =
-                        packageManager.getLaunchIntentForPackage(
-                            selectedPackage
-                        )
-
-                    if (intent != null) {
-
-                        intent.addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK
-                        )
-
-                        startActivity(intent)
-                    }
+                    winXClockTextView?.text =
+                        SimpleDateFormat(
+                            "HH:mm",
+                            Locale.getDefault()
+                        ).format(Date())
 
                 } catch (_: Exception) {
                 }
+
+                handler.postDelayed(
+                    this,
+                    1000
+                )
             }
         }
 
 
-        frame.setOnLongClickListener {
-
-            val selectedPackage =
-                getWinXAppPackage(slot)
-
-            if (selectedPackage.isEmpty()) {
-
-                showWinXAppPicker(slot)
-
-            } else {
-
-                cycleWinXAppShape(slot)
-            }
-
-            true
-        }
-
-
-        return frame
-    }
-
-
-    private fun showWinXAppPicker(slot: Int) {
-
-        try {
-
-            val apps =
-                packageManager
-                    .getInstalledApplications(
-                        PackageManager.GET_META_DATA
-                    )
-                    .filter {
-
-                        it.packageName != packageName &&
-                        packageManager
-                            .getLaunchIntentForPackage(
-                                it.packageName
-                            ) != null
-                    }
-                    .sortedBy {
-
-                        packageManager
-                            .getApplicationLabel(it)
-                            .toString()
-                            .lowercase(
-                                Locale.getDefault()
-                            )
-                    }
-
-
-            if (apps.isEmpty()) return
-
-
-            val labels =
-                apps.map {
-
-                    packageManager
-                        .getApplicationLabel(it)
-                        .toString()
-
-                }.toTypedArray()
-
-
-            val dialog =
-                AlertDialog.Builder(this)
-                    .setTitle(
-                        "اختر تطبيقًا"
-                    )
-                    .setItems(labels) { _, which ->
-
-                        if (
-                            which >= 0 &&
-                            which < apps.size
-                        ) {
-
-                            saveWinXAppPackage(
-                                slot,
-                                apps[which].packageName
-                            )
-
-                            updateOverlayLive()
-                        }
-                    }
-                    .setNegativeButton(
-                        "إلغاء",
-                        null
-                    )
-                    .create()
-
-
-            dialog.window?.setType(
-                WindowManager.LayoutParams
-                    .TYPE_ACCESSIBILITY_OVERLAY
-            )
-
-            dialog.show()
-
-        } catch (_: Exception) {
-        }
-    }
-
-
-    private fun createWinXClockView(
+    private fun createWinXClock(
         buttonColor: Int
     ): TextView {
 
-        val textView = TextView(this)
+        val clock = TextView(this)
 
-        textView.gravity =
+        clock.gravity =
             Gravity.CENTER
 
-        textView.text =
+        clock.isSingleLine = true
+
+        clock.textSize = 14f
+
+        clock.typeface =
+            Typeface.DEFAULT_BOLD
+
+        clock.setTextColor(
+            buttonColor
+        )
+
+        clock.setPadding(
+            dpToPx(3),
+            0,
+            dpToPx(3),
+            0
+        )
+
+        clock.text =
             SimpleDateFormat(
                 "HH:mm",
                 Locale.getDefault()
             ).format(Date())
 
-        textView.setTextColor(
-            buttonColor
-        )
+        winXClockTextView = clock
 
-        textView.textSize = 14f
+        if (!winXClockStarted) {
 
-        textView.typeface =
-            Typeface.DEFAULT_BOLD
+            winXClockStarted = true
 
-        textView.isSingleLine = true
-
-        textView.setPadding(
-            dpToPx(4),
-            0,
-            dpToPx(4),
-            0
-        )
-
-        winXClockTextView =
-            textView
-
-        startWinXClock()
-
-        return textView
-    }
-
-
-    private fun addWinXSpecialViews(
-        container: LinearLayout,
-        shouldSwap: Boolean,
-        hitboxSize: Int,
-        separation: Int,
-        buttonColor: Int,
-        isVerticalBar: Boolean
-    ) {
-
-        val app1 =
-            createWinXAppButton(
-                1,
-                hitboxSize,
-                buttonColor
+            handler.removeCallbacks(
+                winXClockRunnable
             )
 
-        val app2 =
-            createWinXAppButton(
-                2,
-                hitboxSize,
-                buttonColor
+            handler.post(
+                winXClockRunnable
             )
-
-        val app3 =
-            createWinXAppButton(
-                3,
-                hitboxSize,
-                buttonColor
-            )
-
-        val app4 =
-            createWinXAppButton(
-                4,
-                hitboxSize,
-                buttonColor
-            )
-
-        val clock =
-            createWinXClockView(
-                buttonColor
-            )
-
-
-        val back =
-            container.findViewById<FrameLayout>(
-                R.id.backButton
-            )
-
-        val home =
-            container.findViewById<FrameLayout>(
-                R.id.homeButton
-            )
-
-        val recent =
-            container.findViewById<FrameLayout>(
-                R.id.recentButton
-            )
-
-
-        val views: List<View> =
-
-            if (!shouldSwap) {
-
-                listOf(
-                    back,
-                    app1,
-                    app2,
-                    home,
-                    app3,
-                    app4,
-                    clock,
-                    recent
-                )
-
-            } else {
-
-                listOf(
-                    recent,
-                    clock,
-                    app4,
-                    app3,
-                    home,
-                    app2,
-                    app1,
-                    back
-                )
-            }
-
-
-        views.forEachIndexed { index, view ->
-
-            val lp =
-                LinearLayout.LayoutParams(
-                    if (isVerticalBar)
-                        LinearLayout.LayoutParams.MATCH_PARENT
-                    else
-                        if (view === clock)
-                            dpToPx(65)
-                        else
-                            hitboxSize,
-
-                    if (isVerticalBar)
-                        if (view === clock)
-                            dpToPx(65)
-                        else
-                            hitboxSize
-                    else
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-
-                    0f
-                )
-
-
-            if (
-                index <
-                views.size - 1
-            ) {
-
-                if (isVerticalBar) {
-
-                    lp.bottomMargin =
-                        separation
-
-                } else {
-
-                    lp.marginEnd =
-                        separation
-                }
-            }
-
-
-            view.layoutParams = lp
-
-            container.addView(view)
         }
+
+        return clock
     }
 
-    // WINX_APPS_CLOCK_PATCH_END
+    // WINX_CLOCK_ONLY_PATCH_END
 
 """
 
     code = (
-        code[:marker.end()]
-        + extra
-        + code[marker.end():]
+        code[:match.end()]
+        + clock_code
+        + code[match.end():]
     )
 
 
 # ============================================================
-# 6. Replace normal button ordering
-#    Back → Apps → Home → Apps → Clock → Recent
+# 6. Insert clock immediately before Recent Apps
 # ============================================================
 
-if "WINX_SPECIAL_ORDER_PATCH" not in code:
+if "WINX_CLOCK_ORDER_PATCH" not in code:
 
-    old_pattern = re.compile(
-        r"val order = if \(shouldSwap\) "
-        r"listOf\(recentButton, homeButton, backButton\) "
-        r"else listOf\(backButton, homeButton, recentButton\)"
+    # Find the original order declaration
+    pattern = re.compile(
+        r"val order = if \(shouldSwap\)\s*"
+        r"listOf\(recentButton,\s*homeButton,\s*backButton\)\s*"
+        r"else\s*"
+        r"listOf\(backButton,\s*homeButton,\s*recentButton\)"
     )
 
-    match = old_pattern.search(code)
+    match = pattern.search(code)
 
     if not match:
         raise RuntimeError(
@@ -780,20 +366,32 @@ if "WINX_SPECIAL_ORDER_PATCH" not in code:
         )
 
     replacement = """
-    // WINX_SPECIAL_ORDER_PATCH
 
-    addWinXSpecialViews(
-        container,
-        shouldSwap,
-        hitboxSize,
-        separation,
-        buttonColor,
-        isVerticalBar
-    )
+    // WINX_CLOCK_ORDER_PATCH
 
-    // WINX_SPECIAL_ORDER_PATCH_END
+    val clockView =
+        createWinXClock(
+            buttonColor
+        )
 
-    """
+    val order =
+        if (shouldSwap)
+            listOf(
+                recentButton,
+                clockView,
+                homeButton,
+                backButton
+            )
+        else
+            listOf(
+                backButton,
+                homeButton,
+                clockView,
+                recentButton
+            )
+
+    // WINX_CLOCK_ORDER_PATCH_END
+"""
 
     code = (
         code[:match.start()]
@@ -803,28 +401,30 @@ if "WINX_SPECIAL_ORDER_PATCH" not in code:
 
 
 # ============================================================
-# 7. Prevent original order loop from running
+# 7. Clean clock when service is destroyed
 # ============================================================
 
-# The special order already adds the buttons.
-# Remove the original order.forEach block only if it remains.
+if "WINX_CLOCK_DESTROY_PATCH" not in code:
 
-if "WINX_SPECIAL_ORDER_PATCH" in code:
+    marker = "override fun onDestroy() {"
 
-    original_loop = re.compile(
-        r"\n\s*order\.forEachIndexed\s*\{.*?"
-        r"\n\s*\}\n\s*\n\s*val buttonMap",
-        re.DOTALL
-    )
+    if marker in code:
 
-    match = original_loop.search(code)
+        code = code.replace(
+            marker,
+            """override fun onDestroy() {
 
-    if match:
+        // WINX_CLOCK_DESTROY_PATCH
 
-        code = (
-            code[:match.start()]
-            + "\n\n    val buttonMap"
-            + code[match.end():]
+        handler.removeCallbacks(
+            winXClockRunnable
+        )
+
+        winXClockTextView = null
+
+        // WINX_CLOCK_DESTROY_PATCH_END
+""",
+            1
         )
 
 
@@ -836,28 +436,22 @@ with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
 print("==============================================")
-print("WIN X STABLE + APPS + DIGITAL CLOCK")
+print("WIN X STABLE + CLOCK ONLY")
 print("==============================================")
-print("Win X package:", WINX_PACKAGE)
 print("")
 print("ORDER:")
 print("Back")
-print("App 1")
-print("App 2")
 print("Home")
-print("App 3")
-print("App 4")
 print("Digital Clock")
 print("Recent Apps")
 print("")
-print("Apps: 4 configurable slots")
-print("Empty slot: tap to select app")
-print("Long press: change icon shape")
-print("Shapes: circle / rounded / square / sharp")
-print("Clock: HH:mm")
+print("Clock format: HH:mm")
+print("Clock update: every 1 second")
 print("")
-print("Detection: rootInActiveWindow")
-print("Check delay: 250ms")
-print("Inside Win X: HIDE")
+print("Win X: HIDE")
 print("Outside Win X: FORCE SHOW")
+print("Detection delay: 250ms")
+print("")
+print("No app modifications")
+print("No button logic modification")
 print("==============================================")
