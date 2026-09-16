@@ -7,8 +7,31 @@ if len(sys.argv) != 2:
 
 path = sys.argv[1]
 
-with open(path, "r", encoding="utf-8") as f:
+with open(path, "r", encoding="utf-8-sig") as f:
     code = f.read()
+
+
+# ============================================================
+# 0. CLEAN BROKEN IMPORTS FROM PREVIOUS PATCHES
+# ============================================================
+
+# Previous versions could accidentally insert these as bare
+# Kotlin declarations instead of proper imports.
+
+broken_imports = [
+    "java.util.Locale",
+    "java.text.SimpleDateFormat",
+    "java.util.Date",
+    "android.graphics.Typeface",
+    "android.widget.TextView",
+]
+
+for broken in broken_imports:
+    code = re.sub(
+        r"(?m)^[ \t]*" + re.escape(broken) + r"[ \t]*\r?\n",
+        "",
+        code
+    )
 
 
 # ============================================================
@@ -20,14 +43,23 @@ imports = [
     "import android.widget.TextView",
     "import java.text.SimpleDateFormat",
     "import java.util.Date",
-    "java.util.Locale",
+    "import java.util.Locale",
 ]
 
 anchor = "import android.accessibilityservice.AccessibilityService"
 
+if anchor not in code:
+    raise RuntimeError(
+        "AccessibilityService import not found"
+    )
+
 for imp in imports:
     if imp not in code:
-        code = code.replace(anchor, anchor + "\n" + imp)
+        code = code.replace(
+            anchor,
+            anchor + "\n" + imp,
+            1
+        )
 
 
 # ============================================================
@@ -135,11 +167,7 @@ if "WINX_STABLE_PATCH" not in code:
         isHidden = false
         isFullscreenHidden = false
 
-        /*
-         * Important:
-         * Do NOT disable the reveal zone here.
-         * Rebuild it so swipe-to-show continues working.
-         */
+        // Recreate reveal zone so swipe continues working.
         showRevealZone()
     }
 
@@ -400,7 +428,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
     // WINX_CLOCK_DATE_PATCH_END
 
 """
-
 
     code = (
         code[:match.end()]
