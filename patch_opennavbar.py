@@ -13,10 +13,10 @@ with open(path, "r", encoding="utf-8") as f:
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
 # ============================================================
-# 1. Add WinX state + delayed check
+# 1. Add WinX state + force-show function
 # ============================================================
 
-if "WINX_AUTO_SWITCH_PATCH" not in code:
+if "WINX_FORCE_SHOW_PATCH" not in code:
 
     match = re.search(
         r"(class\s+NavigationOverlayService[^{]*\{)",
@@ -26,87 +26,91 @@ if "WINX_AUTO_SWITCH_PATCH" not in code:
     if not match:
         raise RuntimeError("NavigationOverlayService class not found")
 
-    state_code = """
+    insert = """
 
-    // WINX_AUTO_SWITCH_PATCH
+    // WINX_FORCE_SHOW_PATCH
 
     private var isWinXLauncher = false
 
-    private val winXSwitchRunnable = Runnable {
-        if (!isWinXLauncher) {
-            showOverlay()
-        }
+    private fun forceShowAfterWinX() {
+        val view = overlayView ?: return
+
+        // Cancel any hide animation that may still be running
+        view.animate().cancel()
+
+        // Cancel pending auto-hide
+        autoHideRunnable?.let { handler.removeCallbacks(it) }
+        autoHideRunnable = null
+
+        // Immediately restore the overlay
+        view.visibility = View.VISIBLE
+        view.alpha = 1f
+        view.translationX = 0f
+        view.translationY = 0f
+
+        isHidden = false
+        isFullscreenHidden = false
+
+        disableRevealZoneTouch()
     }
 
-    // WINX_AUTO_SWITCH_PATCH_END
+    // WINX_FORCE_SHOW_PATCH_END
 
 """
 
-    code = code[:match.end()] + state_code + code[match.end():]
+    code = code[:match.end()] + insert + code[match.end():]
 
 
 # ============================================================
-# 2. Find AccessibilityEvent handler
+# 2. Patch the existing AccessibilityEvent handler
 # ============================================================
 
-if "WINX_AUTO_EVENT_PATCH" not in code:
+if "WINX_FORCE_EVENT_PATCH" not in code:
 
     match = re.search(
-        r"(fun\s+\w+\s*\([^)]*AccessibilityEvent[^)]*\)\s*\{)",
+        r"(override\s+fun\s+onAccessibilityEvent\s*\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)",
         code
     )
 
     if not match:
         raise RuntimeError(
-            "AccessibilityEvent handler not found"
+            "onAccessibilityEvent(AccessibilityEvent?) not found"
         )
-
-    signature = match.group(1)
-
-    param_match = re.search(
-        r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*AccessibilityEvent",
-        signature
-    )
-
-    if not param_match:
-        raise RuntimeError(
-            "Could not determine AccessibilityEvent parameter"
-        )
-
-    event_var = param_match.group(1)
 
     patch = f"""
 
-        // WINX_AUTO_EVENT_PATCH
+        // WINX_FORCE_EVENT_PATCH
 
-        val winXCurrentPackage =
-            {event_var}?.packageName?.toString() ?: ""
+        val winXPackage =
+            event?.packageName?.toString() ?: ""
 
-        if (winXCurrentPackage == "{WINX_PACKAGE}") {{
+        if (winXPackage == "{WINX_PACKAGE}") {{
 
-            isWinXLauncher = true
+            if (!isWinXLauncher) {{
+                isWinXLauncher = true
 
-            // Cancel any pending re-show
-            handler.removeCallbacks(winXSwitchRunnable)
+                // Cancel anything that could restore the bar
+                handler.removeCallbacks(navBarCheckRunnable)
+                handler.removeCallbacks(insetsDebounce)
+                handler.removeCallbacks(autoHideRunnable)
 
-            // Hide immediately
-            hideOverlay()
+                hideOverlay()
+            }}
 
         }} else {{
 
-            // We have left Win X
             if (isWinXLauncher) {{
-
                 isWinXLauncher = false
 
-                // Small delay allows the new foreground window
-                // to finish becoming active.
-                handler.removeCallbacks(winXSwitchRunnable)
-                handler.postDelayed(winXSwitchRunnable, 80L)
+                // Force the overlay back immediately.
+                // Do NOT use showOverlayAnimated(), because
+                // isHidden may still be false while hide animation
+                // is finishing.
+                forceShowAfterWinX()
             }}
         }}
 
-        // WINX_AUTO_EVENT_PATCH_END
+        // WINX_FORCE_EVENT_PATCH_END
 
 """
 
@@ -114,7 +118,7 @@ if "WINX_AUTO_EVENT_PATCH" not in code:
 
 
 # ============================================================
-# 3. Protect showOverlay()
+# 3. Prevent normal show functions from showing over Win X
 # ============================================================
 
 def protect_function(name):
@@ -133,7 +137,6 @@ def protect_function(name):
         return
 
     start = match.end()
-
     section = code[start:start + 500]
 
     if "if (isWinXLauncher) return" not in section:
@@ -161,9 +164,8 @@ with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
 print("==============================================")
-print("WinX AUTO HIDE / SHOW patch applied")
+print("WIN X FORCE HIDE / SHOW PATCH APPLIED")
 print("==============================================")
-print("WinX package:", WINX_PACKAGE)
-print("Hide: automatic")
-print("Show: automatic after leaving WinX")
-print("Delay: 80ms")
+print("Win X:", WINX_PACKAGE)
+print("Exit behavior: FORCE SHOW")
+print("Animation race: FIXED")
