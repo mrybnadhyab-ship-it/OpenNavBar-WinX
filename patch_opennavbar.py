@@ -1,40 +1,4 @@
-#!/usr/bin/env python3
-
-import re
-import sys
-from pathlib import Path
-
-
-if len(sys.argv) != 2:
-    raise SystemExit("Usage: patch_opennavbar.py <NavigationOverlayService.kt>")
-
-
-p = Path(sys.argv[1])
-
-if not p.exists():
-    raise SystemExit(f"File not found: {p}")
-
-
-s = p.read_text(encoding="utf-8")
-
-
-WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
-
-
-# ---------------------------------------------------------
-# 1. Add WINX_PACKAGE as a TOP-LEVEL constant.
-#    Do NOT create another companion object.
-# ---------------------------------------------------------
-
-if 'private const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"' not in s:
-
-    class_match = re.search(
-        r'class\s+NavigationOverlayService[^\{]*\{',
-        s
-    )
-
-    if not class_match:
-        raise SystemExit(
+patch_opennavbar.py        raise SystemExit(
             "Could not locate NavigationOverlayService class."
         )
 
