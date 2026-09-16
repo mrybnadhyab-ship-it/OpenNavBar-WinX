@@ -13,10 +13,10 @@ with open(path, "r", encoding="utf-8") as f:
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
 # ============================================================
-# 1. Add WinX state + force-show function
+# 1. Add WinX state + stable foreground check
 # ============================================================
 
-if "WINX_FORCE_SHOW_PATCH" not in code:
+if "WINX_STABLE_PATCH" not in code:
 
     match = re.search(
         r"(class\s+NavigationOverlayService[^{]*\{)",
@@ -28,21 +28,82 @@ if "WINX_FORCE_SHOW_PATCH" not in code:
 
     insert = """
 
-    // WINX_FORCE_SHOW_PATCH
+    // WINX_STABLE_PATCH
 
     private var isWinXLauncher = false
 
+    private var winXCheckRunnable: Runnable? = null
+
+    private fun getCurrentForegroundPackage(): String {
+        return try {
+            rootInActiveWindow?.packageName?.toString() ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun checkWinXStateDelayed() {
+
+        winXCheckRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+
+        winXCheckRunnable = Runnable {
+
+            val currentPackage = getCurrentForegroundPackage()
+
+            if (currentPackage == "com.InternityLabs.Launcher.WinX") {
+
+                // We are really inside Win X
+                if (!isWinXLauncher) {
+
+                    isWinXLauncher = true
+
+                    navBarCheckRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    insetsDebounce?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    autoHideRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    hideOverlay()
+                }
+
+            } else {
+
+                // Only restore if Win X was previously active.
+                if (isWinXLauncher) {
+
+                    isWinXLauncher = false
+
+                    forceShowAfterWinX()
+                }
+            }
+        }
+
+        handler.postDelayed(winXCheckRunnable!!, 250)
+    }
+
     private fun forceShowAfterWinX() {
+
         val view = overlayView ?: return
 
-        // Cancel any hide animation that may still be running
+        // Cancel any running animation
         view.animate().cancel()
 
-        // Cancel pending auto-hide
-        autoHideRunnable?.let { handler.removeCallbacks(it) }
+        // Cancel automatic hide
+        autoHideRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+
         autoHideRunnable = null
 
-        // Immediately restore the overlay
+        // Restore overlay immediately
         view.visibility = View.VISIBLE
         view.alpha = 1f
         view.translationX = 0f
@@ -54,7 +115,7 @@ if "WINX_FORCE_SHOW_PATCH" not in code:
         disableRevealZoneTouch()
     }
 
-    // WINX_FORCE_SHOW_PATCH_END
+    // WINX_STABLE_PATCH_END
 
 """
 
@@ -62,10 +123,10 @@ if "WINX_FORCE_SHOW_PATCH" not in code:
 
 
 # ============================================================
-# 2. Patch AccessibilityEvent handler
+# 2. Patch AccessibilityEvent
 # ============================================================
 
-if "WINX_FORCE_EVENT_PATCH" not in code:
+if "WINX_STABLE_EVENT_PATCH" not in code:
 
     match = re.search(
         r"(override\s+fun\s+onAccessibilityEvent\s*\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)",
@@ -77,40 +138,13 @@ if "WINX_FORCE_EVENT_PATCH" not in code:
             "onAccessibilityEvent(AccessibilityEvent?) not found"
         )
 
-    patch = f"""
+    patch = """
 
-        // WINX_FORCE_EVENT_PATCH
+        // WINX_STABLE_EVENT_PATCH
 
-        val winXPackage =
-            event?.packageName?.toString() ?: ""
+        checkWinXStateDelayed()
 
-        if (winXPackage == "{WINX_PACKAGE}") {{
-
-            if (!isWinXLauncher) {{
-                isWinXLauncher = true
-
-                // Cancel anything that could restore the bar
-                navBarCheckRunnable?.let {{ handler.removeCallbacks(it) }}
-                insetsDebounce?.let {{ handler.removeCallbacks(it) }}
-                autoHideRunnable?.let {{ handler.removeCallbacks(it) }}
-
-                hideOverlay()
-            }}
-
-        }} else {{
-
-            if (isWinXLauncher) {{
-                isWinXLauncher = false
-
-                // Force the overlay back immediately.
-                // Do NOT use showOverlayAnimated(), because
-                // isHidden may still be false while hide animation
-                // is finishing.
-                forceShowAfterWinX()
-            }}
-        }}
-
-        // WINX_FORCE_EVENT_PATCH_END
+        // WINX_STABLE_EVENT_PATCH_END
 
 """
 
@@ -118,7 +152,7 @@ if "WINX_FORCE_EVENT_PATCH" not in code:
 
 
 # ============================================================
-# 3. Prevent normal show functions from showing over Win X
+# 3. Protect normal show functions
 # ============================================================
 
 def protect_function(name):
@@ -126,8 +160,8 @@ def protect_function(name):
     global code
 
     pattern = re.compile(
-        r"(fun\s+" + re.escape(name) +
-        r"\s*\([^)]*\)\s*\{)"
+        r"(fun\\s+" + re.escape(name) +
+        r"\\s*\\([^)]*\\)\\s*\\{)"
     )
 
     match = pattern.search(code)
@@ -137,7 +171,7 @@ def protect_function(name):
         return
 
     start = match.end()
-    section = code[start:start + 500]
+    section = code[start:start + 600]
 
     if "if (isWinXLauncher) return" not in section:
 
@@ -164,11 +198,12 @@ with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
 print("==============================================")
-print("WIN X FORCE HIDE / SHOW PATCH APPLIED")
+print("WIN X STABLE HIDE / SHOW PATCH")
 print("==============================================")
 print("Win X package:", WINX_PACKAGE)
+print("Detection: rootInActiveWindow")
+print("Check delay: 250ms")
 print("Inside Win X: HIDE")
 print("Outside Win X: FORCE SHOW")
-print("Animation race: FIXED")
-print("Nullable Runnable errors: FIXED")
+print("Transition events ignored")
 print("==============================================")
