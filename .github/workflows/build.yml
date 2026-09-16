@@ -40,10 +40,11 @@ jobs:
           gradle wrapper --gradle-version 8.13
           chmod +x gradlew
 
-      - name: Check OpenNavBar source
+      - name: Show original NavigationOverlayService
         run: |
-          test -f opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
-          echo "NavigationOverlayService.kt found"
+          echo "===== NavigationOverlayService.kt ====="
+          cat opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
+          echo "===== END FILE ====="
 
       - name: Apply WinX patch
         run: |
