@@ -15,9 +15,6 @@ with open(path, "r", encoding="utf-8-sig") as f:
 # 0. CLEAN BROKEN IMPORTS FROM PREVIOUS PATCHES
 # ============================================================
 
-# Previous versions could accidentally insert these as bare
-# Kotlin declarations instead of proper imports.
-
 broken_imports = [
     "java.util.Locale",
     "java.text.SimpleDateFormat",
@@ -86,6 +83,7 @@ if "WINX_STABLE_PATCH" not in code:
 
     private var winXCheckRunnable: Runnable? = null
 
+
     private fun getCurrentForegroundPackage(): String {
         return try {
             rootInActiveWindow?.packageName?.toString() ?: ""
@@ -93,6 +91,7 @@ if "WINX_STABLE_PATCH" not in code:
             ""
         }
     }
+
 
     private fun checkWinXStateDelayed() {
 
@@ -105,6 +104,7 @@ if "WINX_STABLE_PATCH" not in code:
             val currentPackage =
                 getCurrentForegroundPackage()
 
+
             if (
                 currentPackage ==
                 "com.InternityLabs.Launcher.WinX"
@@ -114,18 +114,28 @@ if "WINX_STABLE_PATCH" not in code:
 
                     isWinXLauncher = true
 
+
                     navBarCheckRunnable?.let {
                         handler.removeCallbacks(it)
                     }
+
 
                     insetsDebounce?.let {
                         handler.removeCallbacks(it)
                     }
 
+
                     autoHideRunnable?.let {
                         handler.removeCallbacks(it)
                     }
 
+
+                    /*
+                     * Hide the navigation bar.
+                     *
+                     * hideOverlay() also enables
+                     * the reveal zone.
+                     */
                     hideOverlay()
                 }
 
@@ -140,6 +150,7 @@ if "WINX_STABLE_PATCH" not in code:
             }
         }
 
+
         handler.postDelayed(
             winXCheckRunnable!!,
             250
@@ -149,9 +160,12 @@ if "WINX_STABLE_PATCH" not in code:
 
     private fun forceShowAfterWinX() {
 
-        val view = overlayView ?: return
+        val view =
+            overlayView ?: return
+
 
         view.animate().cancel()
+
 
         autoHideRunnable?.let {
             handler.removeCallbacks(it)
@@ -159,16 +173,33 @@ if "WINX_STABLE_PATCH" not in code:
 
         autoHideRunnable = null
 
-        view.visibility = View.VISIBLE
-        view.alpha = 1f
-        view.translationX = 0f
-        view.translationY = 0f
 
-        isHidden = false
-        isFullscreenHidden = false
+        view.visibility =
+            View.VISIBLE
 
-        // Recreate reveal zone so swipe continues working.
-        showRevealZone()
+        view.alpha =
+            1f
+
+        view.translationX =
+            0f
+
+        view.translationY =
+            0f
+
+
+        isHidden =
+            false
+
+        isFullscreenHidden =
+            false
+
+
+        /*
+         * Keep the existing reveal zone.
+         *
+         * Do not recreate it.
+         */
+        disableRevealZoneTouch()
     }
 
     // WINX_STABLE_PATCH_END
@@ -288,6 +319,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
     private var winXClockStarted = false
 
+
     private val winXClockRunnable =
         object : Runnable {
 
@@ -295,23 +327,44 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
                 try {
 
-                    val now = Date()
+                    val now =
+                        Date()
 
+
+                    /*
+                     * 12-hour clock.
+                     *
+                     * AM -> ص
+                     * PM -> م
+                     */
                     val timeText =
                         SimpleDateFormat(
                             "hh:mm a",
                             Locale.ENGLISH
                         )
                             .format(now)
-                            .replace("AM", "ص")
-                            .replace("PM", "م")
+                            .replace(
+                                "AM",
+                                "ص"
+                            )
+                            .replace(
+                                "PM",
+                                "م"
+                            )
 
+
+                    /*
+                     * Date:
+                     *
+                     * yyyy/MM/dd
+                     */
                     val dateText =
                         SimpleDateFormat(
                             "yyyy/MM/dd",
                             Locale.ENGLISH
                         )
                             .format(now)
+
 
                     winXClockTextView?.text =
                         timeText
@@ -321,6 +374,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
                 } catch (_: Exception) {
                 }
+
 
                 handler.postDelayed(
                     this,
@@ -337,53 +391,91 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         val layout =
             LinearLayout(this)
 
+
         layout.orientation =
             LinearLayout.VERTICAL
+
 
         layout.gravity =
             Gravity.CENTER
 
+
+        /*
+         * Minimal horizontal padding.
+         */
         layout.setPadding(
-            dpToPx(2),
+            dpToPx(1),
             0,
-            dpToPx(2),
+            dpToPx(1),
             0
         )
 
 
+        /*
+         * CLOCK
+         */
         val clock =
             TextView(this)
+
 
         clock.gravity =
             Gravity.CENTER
 
-        clock.isSingleLine = true
 
-        clock.textSize = 13f
+        clock.isSingleLine =
+            true
+
+
+        /*
+         * Clock is larger.
+         */
+        clock.textSize =
+            13f
+
 
         clock.typeface =
             Typeface.DEFAULT_BOLD
+
 
         clock.setTextColor(
             buttonColor
         )
 
 
+        /*
+         * DATE
+         */
         val date =
             TextView(this)
+
 
         date.gravity =
             Gravity.CENTER
 
-        date.isSingleLine = true
 
-        date.textSize = 8f
+        date.isSingleLine =
+            true
+
+
+        /*
+         * Date is smaller.
+         */
+        date.textSize =
+            8f
+
+
+        date.typeface =
+            Typeface.DEFAULT
+
 
         date.setTextColor(
             buttonColor
         )
 
 
+        /*
+         * Clock.
+         */
         layout.addView(
             clock,
             LinearLayout.LayoutParams(
@@ -392,6 +484,10 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             )
         )
 
+
+        /*
+         * Date directly underneath.
+         */
         layout.addView(
             date,
             LinearLayout.LayoutParams(
@@ -404,17 +500,24 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         winXClockTextView =
             clock
 
+
         winXDateTextView =
             date
 
 
+        /*
+         * Start clock only once.
+         */
         if (!winXClockStarted) {
 
-            winXClockStarted = true
+            winXClockStarted =
+                true
+
 
             handler.removeCallbacks(
                 winXClockRunnable
             )
+
 
             handler.post(
                 winXClockRunnable
@@ -437,7 +540,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
 
 # ============================================================
-# 6. REPLACE ONLY THE ORIGINAL ORDER
+# 6. CLOCK ORDER + POSITION
 # ============================================================
 
 if "WINX_CLOCK_ORDER_PATCH" not in code:
@@ -456,17 +559,28 @@ if "WINX_CLOCK_ORDER_PATCH" not in code:
             "Original navigation order not found"
         )
 
+
     replacement = """
 
         // WINX_CLOCK_ORDER_PATCH
 
+
+        /*
+         * Create clock + date.
+         */
         val clockView =
             createWinXClock(
                 buttonColor
             )
 
+
+        /*
+         * Smaller width makes the clock
+         * closer to Recent Apps.
+         */
         val clockWidth =
-            dpToPx(62)
+            dpToPx(50)
+
 
         clockView.layoutParams =
             LinearLayout.LayoutParams(
@@ -474,15 +588,27 @@ if "WINX_CLOCK_ORDER_PATCH" not in code:
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
 
+
+        /*
+         * Normal portrait order:
+         *
+         * Back
+         * Home
+         * Clock + Date
+         * Recent Apps
+         */
         val order =
             if (shouldSwap)
+
                 listOf(
                     recentButton,
                     clockView,
                     homeButton,
                     backButton
                 )
+
             else
+
                 listOf(
                     backButton,
                     homeButton,
@@ -490,9 +616,11 @@ if "WINX_CLOCK_ORDER_PATCH" not in code:
                     recentButton
                 )
 
+
         // WINX_CLOCK_ORDER_PATCH_END
 
 """
+
 
     code = (
         code[:match.start()]
@@ -502,7 +630,68 @@ if "WINX_CLOCK_ORDER_PATCH" not in code:
 
 
 # ============================================================
-# 7. CLEAN CLOCK ON DESTROY
+# 7. REMOVE GAP AFTER CLOCK
+# ============================================================
+
+if "WINX_CLOCK_GAP_PATCH" not in code:
+
+    pattern = re.compile(
+        r"if\s*\(index\s*<\s*order\.size\s*-\s*1\)\s*\{"
+        r"\s*"
+        r"if\s*\(isVerticalBar\)\s*"
+        r"lp\.bottomMargin\s*=\s*separation\s*"
+        r"else\s*"
+        r"lp\.marginEnd\s*=\s*separation\s*"
+        r"\}"
+    )
+
+
+    replacement = """
+
+            // WINX_CLOCK_GAP_PATCH
+
+            if (index < order.size - 1) {
+
+                if (isVerticalBar) {
+
+                    lp.bottomMargin =
+                        if (frame === clockView)
+                            0
+                        else
+                            separation
+
+                } else {
+
+                    lp.marginEnd =
+                        if (frame === clockView)
+                            0
+                        else
+                            separation
+                }
+            }
+
+            // WINX_CLOCK_GAP_PATCH_END
+
+"""
+
+
+    if pattern.search(code):
+
+        code = pattern.sub(
+            replacement,
+            code,
+            count=1
+        )
+
+    else:
+
+        print(
+            "Warning: original separation block not found"
+        )
+
+
+# ============================================================
+# 8. CLEAN CLOCK ON DESTROY
 # ============================================================
 
 if "WINX_CLOCK_DESTROY_PATCH" not in code:
@@ -522,7 +711,9 @@ if "WINX_CLOCK_DESTROY_PATCH" not in code:
         )
 
         winXClockTextView = null
+
         winXDateTextView = null
+
         winXClockStarted = false
 
         // WINX_CLOCK_DESTROY_PATCH_END
@@ -532,10 +723,15 @@ if "WINX_CLOCK_DESTROY_PATCH" not in code:
 
 
 # ============================================================
-# 8. SAVE
+# 9. SAVE
 # ============================================================
 
-with open(path, "w", encoding="utf-8") as f:
+with open(
+    path,
+    "w",
+    encoding="utf-8"
+) as f:
+
     f.write(code)
 
 
@@ -549,11 +745,20 @@ print("Home")
 print("Clock + Date")
 print("Recent Apps")
 print("")
-print("Clock format:")
-print("hh:mm ص/م")
+print("Clock:")
+print("13sp / Bold")
+print("12-hour")
+print("ص / م")
 print("")
 print("Date:")
+print("8sp / Normal")
 print("yyyy/MM/dd")
+print("")
+print("Clock width:")
+print("50dp")
+print("")
+print("Clock -> Recent gap:")
+print("0dp")
 print("")
 print("Win X:")
 print("HIDE")
@@ -562,7 +767,7 @@ print("Outside Win X:")
 print("FORCE SHOW")
 print("")
 print("Reveal swipe:")
-print("RESTORED")
+print("Existing reveal zone preserved")
 print("")
 print("No app modifications")
 print("No button logic modification")
