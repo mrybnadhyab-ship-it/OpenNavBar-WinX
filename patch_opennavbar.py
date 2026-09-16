@@ -62,7 +62,7 @@ if "WINX_FORCE_SHOW_PATCH" not in code:
 
 
 # ============================================================
-# 2. Patch the existing AccessibilityEvent handler
+# 2. Patch AccessibilityEvent handler
 # ============================================================
 
 if "WINX_FORCE_EVENT_PATCH" not in code:
@@ -90,9 +90,9 @@ if "WINX_FORCE_EVENT_PATCH" not in code:
                 isWinXLauncher = true
 
                 // Cancel anything that could restore the bar
-                handler.removeCallbacks(navBarCheckRunnable)
-                handler.removeCallbacks(insetsDebounce)
-                handler.removeCallbacks(autoHideRunnable)
+                navBarCheckRunnable?.let {{ handler.removeCallbacks(it) }}
+                insetsDebounce?.let {{ handler.removeCallbacks(it) }}
+                autoHideRunnable?.let {{ handler.removeCallbacks(it) }}
 
                 hideOverlay()
             }}
@@ -166,6 +166,9 @@ with open(path, "w", encoding="utf-8") as f:
 print("==============================================")
 print("WIN X FORCE HIDE / SHOW PATCH APPLIED")
 print("==============================================")
-print("Win X:", WINX_PACKAGE)
-print("Exit behavior: FORCE SHOW")
+print("Win X package:", WINX_PACKAGE)
+print("Inside Win X: HIDE")
+print("Outside Win X: FORCE SHOW")
 print("Animation race: FIXED")
+print("Nullable Runnable errors: FIXED")
+print("==============================================")
