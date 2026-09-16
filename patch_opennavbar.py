@@ -265,11 +265,6 @@ def protect_function(name):
         )
 
 
-# IMPORTANT:
-# showOverlay() is blocked during Win X.
-# showOverlayAnimated() must remain available for
-# the explicit reveal gesture.
-
 protect_function("showOverlay")
 
 
@@ -341,8 +336,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
                 try {
 
-                    val now =
-                        Date()
+                    val now = Date()
 
                     val timeText =
                         SimpleDateFormat(
@@ -350,14 +344,8 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
                             Locale.ENGLISH
                         )
                             .format(now)
-                            .replace(
-                                "AM",
-                                "ص"
-                            )
-                            .replace(
-                                "PM",
-                                "م"
-                            )
+                            .replace("AM", "ص")
+                            .replace("PM", "م")
 
                     val dateText =
                         SimpleDateFormat(
@@ -405,12 +393,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         )
 
 
-        /*
-         * CLOCK
-         *
-         * Keep current design:
-         * 13sp / Bold
-         */
         val clock =
             TextView(this)
 
@@ -434,12 +416,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             textRotation
 
 
-        /*
-         * DATE
-         *
-         * Keep current design:
-         * 8sp / Normal
-         */
         val date =
             TextView(this)
 
@@ -470,7 +446,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
-
 
         layout.addView(
             date,
@@ -518,7 +493,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
 
 # ============================================================
-# 7. EDGE LAYOUT + CLOCK POSITION
+# 7. EDGE LAYOUT
 # ============================================================
 
 if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
@@ -540,6 +515,7 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
     replacement = """container.removeAllViews()
 
+
     /*
      * Clock rotation:
      *
@@ -555,9 +531,6 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
         }
 
 
-    /*
-     * Existing clock design is preserved.
-     */
     val clockView =
         createWinXClock(
             buttonColor,
@@ -566,23 +539,24 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
 
     /*
-     * Keep clock width exactly 50dp.
+     * Clock width = 50dp
      */
     val clockWidth =
         dpToPx(50)
 
 
     /*
-     * Flexible spacer.
+     * Flexible spacer keeps the two sides
+     * separated.
      *
      * Normal:
      *
-     * Back | Home | spacer | Clock | Recent
+     * Back | Home | SPACE | Clock | Recent
      *
      * Therefore:
-     * Back = edge
-     * Recent Apps = opposite edge
-     * Clock = directly beside Recent Apps
+     * Back = left edge
+     * Recent = right edge
+     * Clock touches Recent
      */
     val spacer =
         View(this)
@@ -639,10 +613,6 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
             } else if (item === clockView) {
 
-                /*
-                 * Clock width remains 50dp
-                 * on the horizontal bar.
-                 */
                 if (isVerticalBar) {
 
                     LinearLayout.LayoutParams(
@@ -662,9 +632,6 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
             } else {
 
-                /*
-                 * Existing navigation button size.
-                 */
                 if (isVerticalBar) {
 
                     LinearLayout.LayoutParams(
@@ -762,7 +729,7 @@ if "WINX_EDGE_GRAVITY_PATCH" not in code:
 
 
 # ============================================================
-# 9. REVEAL ZONE / SWIPE FIX
+# 9. KEEP REVEAL ZONE / SWIPE PATCH
 # ============================================================
 
 if "WINX_REVEAL_ZONE_PATCH" not in code:
@@ -793,11 +760,6 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
         position == "left" ||
         position == "right"
 
-    /*
-     * Keep user preference,
-     * but never make the swipe zone
-     * smaller than 12dp.
-     */
     val thicknessPref =
         prefs.getInt(
             "reveal_zone_thickness",
@@ -825,10 +787,6 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
 
                     MotionEvent.ACTION_DOWN -> {
 
-                        /*
-                         * Make sure Win X is fully hidden
-                         * before processing the swipe.
-                         */
                         if (
                             isWinXLauncher &&
                             !isHidden
@@ -901,10 +859,6 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
                             slideDistance >= requiredDistance
                         ) {
 
-                            /*
-                             * TRUE allows the explicit
-                             * reveal gesture during Win X.
-                             */
                             showOverlayAnimated(
                                 true
                             )
@@ -964,140 +918,4 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
             if (isVerticalBar)
                 WindowManager.LayoutParams.MATCH_PARENT
             else
-                zoneThickness,
-
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-
-            PixelFormat.TRANSLUCENT
-        )
-
-    params.gravity =
-        when (position) {
-
-            "left" ->
-                Gravity.START
-
-            "right" ->
-                Gravity.END
-
-            else ->
-                Gravity.BOTTOM
-        }
-
-    /*
-     * Touchable only while hidden.
-     */
-    if (!isHidden) {
-
-        params.flags =
-            params.flags or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-    }
-
-    windowManager.addView(
-        revealZoneView,
-        params
-    )
-
-    // WINX_REVEAL_ZONE_PATCH_END
-}
-
-"""
-
-    code = (
-        code[:match.start()]
-        + replacement
-        + code[match.end():]
-    )
-
-
-# ============================================================
-# 10. CLEAN CLOCK ON DESTROY
-# ============================================================
-
-if "WINX_CLOCK_DESTROY_PATCH" not in code:
-
-    marker = "override fun onDestroy() {"
-
-    if marker in code:
-
-        code = code.replace(
-            marker,
-            """override fun onDestroy() {
-
-        // WINX_CLOCK_DESTROY_PATCH
-
-        handler.removeCallbacks(
-            winXClockRunnable
-        )
-
-        winXClockTextView = null
-
-        winXDateTextView = null
-
-        winXClockStarted = false
-
-        // WINX_CLOCK_DESTROY_PATCH_END
-""",
-            1
-        )
-
-
-# ============================================================
-# 11. SAVE
-# ============================================================
-
-with open(
-    path,
-    "w",
-    encoding="utf-8"
-) as f:
-
-    f.write(code)
-
-
-print("==============================================")
-print("WIN X STABLE + CLOCK + DATE + EDGE + SWIPE")
-print("==============================================")
-print("")
-print("LAYOUT:")
-print("Back -> edge")
-print("Home")
-print("Flexible space")
-print("Clock + Date")
-print("Recent Apps -> opposite edge")
-print("")
-print("CLOCK:")
-print("13sp / Bold")
-print("12-hour")
-print("ص / م")
-print("")
-print("DATE:")
-print("8sp / Normal")
-print("yyyy/MM/dd")
-print("")
-print("CLOCK WIDTH:")
-print("50dp")
-print("")
-print("CLOCK -> RECENT GAP:")
-print("0dp")
-print("")
-print("VERTICAL BAR:")
-print("Clock + Date rotate")
-print("")
-print("WIN X:")
-print("Hidden")
-print("")
-print("REVEAL:")
-print("Swipe enabled")
-print("")
-print("OUTSIDE WIN X:")
-print("Force show")
-print("")
-print("No app slots")
-print("No button logic changes")
-print("==============================================")
+         
