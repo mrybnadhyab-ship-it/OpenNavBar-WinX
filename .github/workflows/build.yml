@@ -26,15 +26,41 @@ jobs:
         run: |
           git clone --depth 1 https://codeberg.org/ItsZariep/OpenNavBar.git opennavbar
 
-      - name: Check OpenNavBar source
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.13'
+
+      - name: Create Gradle wrapper
+        working-directory: opennavbar
         run: |
-          echo "OpenNavBar files:"
-          ls -la opennavbar
+          gradle wrapper
+
+      - name: Check OpenNavBar source
+        working-directory: opennavbar
+        run: |
           echo "Gradle wrapper:"
-          ls -la opennavbar/gradlew
+          ls -la gradlew
+          echo "Project files:"
+          ls -la
 
       - name: Apply WinX modification
         run: |
+          python3 patch_opennavbar.py \
+            opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
+
+      - name: Build APK
+        working-directory: opennavbar
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenNavBar-WinX-debug
+          path: opennavbar/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error        run: |
           python3 patch_opennavbar.py \
             opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
 
