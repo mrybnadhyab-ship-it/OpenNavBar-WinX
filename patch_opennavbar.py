@@ -1,48 +1,157 @@
 #!/usr/bin/env python3
+
 import re
 import sys
 from pathlib import Path
 
+
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: patch_opennavbar.py <NavigationOverlayService.kt>")
+
+
 p = Path(sys.argv[1])
+
+if not p.exists():
+    raise SystemExit(f"File not found: {p}")
+
+
 s = p.read_text(encoding="utf-8")
 
-if 'WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"' not in s:
-    m = re.search(r'(class\s+NavigationOverlayService[^\{]*\{)', s)
-    if not m:
-        raise SystemExit("Could not locate NavigationOverlayService class.")
-    insert = m.group(1) + '''
-    private var isWinXLauncher = false
-    private companion object {
-        const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
-    }
-'''
-    s = s[:m.start()] + insert + s[m.end():]
+
+WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
+
+
+# ---------------------------------------------------------
+# 1. Add WINX_PACKAGE as a TOP-LEVEL constant.
+#    Do NOT create another companion object.
+# ---------------------------------------------------------
+
+if 'private const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"' not in s:
+
+    class_match = re.search(
+        r'class\s+NavigationOverlayService[^\{]*\{',
+        s
+    )
+
+    if not class_match:
+        raise SystemExit(
+            "Could not locate NavigationOverlayService class."
+        )
+
+    top_level_constant = (
+        'private const val WINX_PACKAGE = '
+        '"com.InternityLabs.Launcher.WinX"\n\n'
+    )
+
+    s = (
+        s[:class_match.start()]
+        + top_level_constant
+        + s[class_match.start():]
+    )
+
+
+# ---------------------------------------------------------
+# 2. Add WinX state variable inside the class.
+# ---------------------------------------------------------
+
+if 'private var isWinXLauncher = false' not in s:
+
+    class_match = re.search(
+        r'(class\s+NavigationOverlayService[^\{]*\{)',
+        s
+    )
+
+    if not class_match:
+        raise SystemExit(
+            "Could not locate NavigationOverlayService class."
+        )
+
+    insert = (
+        class_match.group(1)
+        + '\n\n'
+        + 'private var isWinXLauncher = false\n'
+    )
+
+    s = (
+        s[:class_match.start()]
+        + insert
+        + s[class_match.end():]
+    )
+
+
+# ---------------------------------------------------------
+# 3. Prevent the navigation overlay from being shown
+#    while WinX is the foreground launcher.
+# ---------------------------------------------------------
 
 if 'if (isWinXLauncher) return' not in s:
-    m = re.search(r'((?:private|public|protected|internal)?\s*fun\s+showOverlayAnimated\s*\([^)]*\)\s*\{)', s)
-    if m:
-        s = s[:m.end()] + '\n        if (isWinXLauncher) return\n' + s[m.end():]
 
-if 'event.packageName?.toString() == WINX_PACKAGE' not in s:
-    pos = s.find('AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED')
+    show_match = re.search(
+        r'((?:private|public|protected|internal)?\s*'
+        r'fun\s+showOverlayAnimated\s*'
+        r'\([^)]*\)\s*\{)',
+        s
+    )
+
+    if show_match:
+
+        injection = (
+            '\n'
+            '        if (isWinXLauncher) return\n'
+        )
+
+        s = (
+            s[:show_match.end()]
+            + injection
+            + s[show_match.end():]
+        )
+
+
+# ---------------------------------------------------------
+# 4. Detect when WinX becomes the foreground application.
+# ---------------------------------------------------------
+
+if 'val nowWinX = foregroundPackage == WINX_PACKAGE' not in s:
+
+    pos = s.find(
+        'AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED'
+    )
+
     if pos == -1:
-        raise SystemExit("Could not locate TYPE_WINDOW_STATE_CHANGED handling.")
+        raise SystemExit(
+            "Could not locate TYPE_WINDOW_STATE_CHANGED handling."
+        )
+
     brace = s.find('{', pos)
+
     if brace == -1:
-        raise SystemExit("Could not locate event block.")
+        raise SystemExit(
+            "Could not locate event block."
+        )
+
     code = '''
             val foregroundPackage = event.packageName?.toString()
             val nowWinX = foregroundPackage == WINX_PACKAGE
+
             if (nowWinX != isWinXLauncher) {
                 isWinXLauncher = nowWinX
+
                 if (nowWinX) {
                     hideOverlay()
                 } else {
                     showOverlayAnimated()
                 }
             }
+
 '''
+
     s = s[:brace + 1] + code + s[brace + 1:]
 
+
+# ---------------------------------------------------------
+# 5. Write the patched Kotlin file.
+# ---------------------------------------------------------
+
 p.write_text(s, encoding="utf-8")
+
 print("Patched:", p)
