@@ -13,10 +13,10 @@ with open(path, "r", encoding="utf-8") as f:
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
 # ============================================================
-# 1. Add WinX state variable
+# 1. Add WinX state + delayed check
 # ============================================================
 
-if "WINX_PATCH_STATE" not in code:
+if "WINX_AUTO_SWITCH_PATCH" not in code:
 
     match = re.search(
         r"(class\s+NavigationOverlayService[^{]*\{)",
@@ -26,23 +26,30 @@ if "WINX_PATCH_STATE" not in code:
     if not match:
         raise RuntimeError("NavigationOverlayService class not found")
 
-    code = (
-        code[:match.end()]
-        + """
+    state_code = """
 
-    // WINX_PATCH_STATE
+    // WINX_AUTO_SWITCH_PATCH
+
     private var isWinXLauncher = false
-    // WINX_PATCH_STATE_END
+
+    private val winXSwitchRunnable = Runnable {
+        if (!isWinXLauncher) {
+            showOverlay()
+        }
+    }
+
+    // WINX_AUTO_SWITCH_PATCH_END
 
 """
-        + code[match.end():]
-    )
+
+    code = code[:match.end()] + state_code + code[match.end():]
+
 
 # ============================================================
 # 2. Find AccessibilityEvent handler
 # ============================================================
 
-if "WINX_PATCH_EVENT" not in code:
+if "WINX_AUTO_EVENT_PATCH" not in code:
 
     match = re.search(
         r"(fun\s+\w+\s*\([^)]*AccessibilityEvent[^)]*\)\s*\{)",
@@ -50,7 +57,9 @@ if "WINX_PATCH_EVENT" not in code:
     )
 
     if not match:
-        raise RuntimeError("AccessibilityEvent handler not found")
+        raise RuntimeError(
+            "AccessibilityEvent handler not found"
+        )
 
     signature = match.group(1)
 
@@ -68,33 +77,44 @@ if "WINX_PATCH_EVENT" not in code:
 
     patch = f"""
 
-        // WINX_PATCH_EVENT
-        val currentPackage =
+        // WINX_AUTO_EVENT_PATCH
+
+        val winXCurrentPackage =
             {event_var}?.packageName?.toString() ?: ""
 
-        if (currentPackage == "{WINX_PACKAGE}") {{
+        if (winXCurrentPackage == "{WINX_PACKAGE}") {{
 
-            if (!isWinXLauncher) {{
-                isWinXLauncher = true
-                hideOverlay()
-            }}
+            isWinXLauncher = true
+
+            // Cancel any pending re-show
+            handler.removeCallbacks(winXSwitchRunnable)
+
+            // Hide immediately
+            hideOverlay()
 
         }} else {{
 
+            // We have left Win X
             if (isWinXLauncher) {{
+
                 isWinXLauncher = false
-                showOverlay()
+
+                // Small delay allows the new foreground window
+                // to finish becoming active.
+                handler.removeCallbacks(winXSwitchRunnable)
+                handler.postDelayed(winXSwitchRunnable, 80L)
             }}
         }}
 
-        // WINX_PATCH_EVENT_END
+        // WINX_AUTO_EVENT_PATCH_END
 
 """
 
     code = code[:match.end()] + patch + code[match.end():]
 
+
 # ============================================================
-# 3. Block overlay while WinX is active
+# 3. Protect showOverlay()
 # ============================================================
 
 def protect_function(name):
@@ -109,23 +129,29 @@ def protect_function(name):
     match = pattern.search(code)
 
     if not match:
+        print("Warning: function not found:", name)
         return
 
     start = match.end()
 
-    section = code[start:start + 300]
+    section = code[start:start + 500]
 
     if "if (isWinXLauncher) return" not in section:
 
         code = (
             code[:start]
-            + "\n        if (isWinXLauncher) return\n"
+            + """
+
+        if (isWinXLauncher) return
+
+"""
             + code[start:]
         )
 
 
 protect_function("showOverlay")
 protect_function("showOverlayAnimated")
+
 
 # ============================================================
 # 4. Save
@@ -134,6 +160,10 @@ protect_function("showOverlayAnimated")
 with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
-print("======================================")
-print("WinX automatic hide/show patch applied")
-print("======================================")
+print("==============================================")
+print("WinX AUTO HIDE / SHOW patch applied")
+print("==============================================")
+print("WinX package:", WINX_PACKAGE)
+print("Hide: automatic")
+print("Show: automatic after leaving WinX")
+print("Delay: 80ms")
