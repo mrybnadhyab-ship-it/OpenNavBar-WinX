@@ -19,13 +19,11 @@ if not p.exists():
 
 s = p.read_text(encoding="utf-8")
 
-
 WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
 
 # ---------------------------------------------------------
 # 1. Add WINX_PACKAGE outside the class.
-#    This avoids creating a second companion object.
 # ---------------------------------------------------------
 
 if 'private const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"' not in s:
@@ -53,7 +51,7 @@ if 'private const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"' not in s
 
 
 # ---------------------------------------------------------
-# 2. Add WinX state variable inside NavigationOverlayService.
+# 2. Add WinX state variable.
 # ---------------------------------------------------------
 
 if 'private var isWinXLauncher = false' not in s:
@@ -76,33 +74,55 @@ if 'private var isWinXLauncher = false' not in s:
 
 
 # ---------------------------------------------------------
-# 3. Prevent the overlay from appearing while WinX
-#    is the foreground application.
+# 3. Block ALL normal overlay showing while WinX is active.
 # ---------------------------------------------------------
 
-if 'if (isWinXLauncher) return' not in s:
+show_match = re.search(
+    r'((?:private|public|protected|internal)?\s*'
+    r'fun\s+showOverlay\s*\([^)]*\)\s*\{)',
+    s
+)
 
-    show_match = re.search(
-        r'((?:private|public|protected|internal)?\s*'
-        r'fun\s+showOverlayAnimated\s*'
-        r'\([^)]*\)\s*\{)',
-        s
+if show_match and 'if (isWinXLauncher) return' not in s[
+    show_match.end():show_match.end() + 200
+]:
+
+    s = (
+        s[:show_match.end()]
+        + '\n        if (isWinXLauncher) return\n'
+        + s[show_match.end():]
     )
 
-    if show_match:
 
-        s = (
-            s[:show_match.end()]
-            + '\n        if (isWinXLauncher) return\n'
-            + s[show_match.end():]
-        )
+# ---------------------------------------------------------
+# 4. Also block animated showing while WinX is active.
+# ---------------------------------------------------------
+
+show_anim_match = re.search(
+    r'((?:private|public|protected|internal)?\s*'
+    r'fun\s+showOverlayAnimated\s*\([^)]*\)\s*\{)',
+    s
+)
+
+if show_anim_match and 'if (isWinXLauncher) return' not in s[
+    show_anim_match.end():show_anim_match.end() + 200
+]:
+
+    s = (
+        s[:show_anim_match.end()]
+        + '\n        if (isWinXLauncher) return\n'
+        + s[show_anim_match.end():]
+    )
 
 
 # ---------------------------------------------------------
-# 4. Detect WinX from AccessibilityEvent.
+# 5. Detect WinX from AccessibilityEvent.
+#    Handles both STATE_CHANGED and CONTENT_CHANGED.
 # ---------------------------------------------------------
 
-if 'val nowWinX = foregroundPackage == WINX_PACKAGE' not in s:
+marker = 'val nowWinX = foregroundPackage == WINX_PACKAGE'
+
+if marker not in s:
 
     pos = s.find(
         'AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED'
@@ -110,7 +130,7 @@ if 'val nowWinX = foregroundPackage == WINX_PACKAGE' not in s:
 
     if pos == -1:
         raise SystemExit(
-            "Could not locate TYPE_WINDOW_STATE_CHANGED handling."
+            "Could not locate AccessibilityEvent handling."
         )
 
     brace = s.find('{', pos)
@@ -134,7 +154,7 @@ if 'val nowWinX = foregroundPackage == WINX_PACKAGE' not in s:
                   }
               }
 
-  '''
+'''
 
     s = (
         s[:brace + 1]
@@ -144,7 +164,7 @@ if 'val nowWinX = foregroundPackage == WINX_PACKAGE' not in s:
 
 
 # ---------------------------------------------------------
-# 5. Save patched file.
+# 6. Save patched file.
 # ---------------------------------------------------------
 
 p.write_text(s, encoding="utf-8")
