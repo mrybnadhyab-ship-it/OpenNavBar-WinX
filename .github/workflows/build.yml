@@ -60,19 +60,4 @@ jobs:
         with:
           name: OpenNavBar-WinX-debug
           path: opennavbar/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error        run: |
-          python3 patch_opennavbar.py \
-            opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
-
-      - name: Build APK
-        working-directory: opennavbar
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenNavBar-WinX-debug
-          path: opennavbar/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
