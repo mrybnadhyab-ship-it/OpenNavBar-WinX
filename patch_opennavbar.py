@@ -400,12 +400,8 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         )
 
 
-        /*
-         * CLOCK
-         *
-         * Reduced only to match
-         * the navigation icon size better.
-         */
+        // CLOCK
+
         val clock =
             TextView(this)
 
@@ -415,6 +411,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         clock.isSingleLine =
             true
 
+        // Reduced to match the navigation icons.
         clock.textSize =
             10f
 
@@ -429,12 +426,8 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             textRotation
 
 
-        /*
-         * DATE
-         *
-         * Reduced only to match
-         * the navigation icon size better.
-         */
+        // DATE
+
         val date =
             TextView(this)
 
@@ -444,6 +437,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         date.isSingleLine =
             true
 
+        // Reduced to match the navigation icons.
         date.textSize =
             7f
 
@@ -916,4 +910,12 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
                     }
 
                     else -> {
-          
+                        true
+                    }
+                }
+            }
+        }
+
+
+    val params =
+        WindowMana
