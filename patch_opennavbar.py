@@ -1,11 +1,14 @@
 import sys
 import re
 
+
 if len(sys.argv) != 2:
     print("Usage: python3 patch_opennavbar.py <NavigationOverlayService.kt>")
     sys.exit(1)
 
+
 path = sys.argv[1]
+
 
 with open(path, "r", encoding="utf-8") as f:
     code = f.read()
@@ -26,12 +29,15 @@ required_imports = [
     "import java.util.Locale",
 ]
 
+
 anchor = "import android.accessibilityservice.AccessibilityService"
+
 
 if anchor not in code:
     raise RuntimeError(
         "AccessibilityService import not found"
     )
+
 
 for imp in required_imports:
     if imp not in code:
@@ -58,12 +64,12 @@ if "WINX_STABLE_PATCH" not in code:
             "NavigationOverlayService class not found"
         )
 
-    winx_patch = '''
 
+    winx_patch = r'''
+    
     // WINX_STABLE_PATCH
 
     private var isWinXLauncher = false
-
     private var winXCheckRunnable: Runnable? = null
 
 
@@ -81,6 +87,7 @@ if "WINX_STABLE_PATCH" not in code:
         winXCheckRunnable?.let {
             handler.removeCallbacks(it)
         }
+
 
         winXCheckRunnable = Runnable {
 
@@ -155,11 +162,14 @@ if "WINX_STABLE_PATCH" not in code:
         view.visibility =
             View.VISIBLE
 
+
         view.alpha =
             1f
 
+
         view.translationX =
             0f
+
 
         view.translationY =
             0f
@@ -168,6 +178,7 @@ if "WINX_STABLE_PATCH" not in code:
         isHidden =
             false
 
+
         isFullscreenHidden =
             false
 
@@ -175,9 +186,11 @@ if "WINX_STABLE_PATCH" not in code:
         disableRevealZoneTouch()
     }
 
+
     // WINX_STABLE_PATCH_END
 
 '''
+
 
     code = (
         code[:match.end()]
@@ -197,13 +210,15 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
         r"\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)"
     )
 
+
     if not match:
         raise RuntimeError(
             "onAccessibilityEvent(AccessibilityEvent?) not found"
         )
 
-    event_patch = '''
 
+    event_patch = r'''
+        
         // WINX_STABLE_EVENT_PATCH
 
         checkWinXStateDelayed()
@@ -211,6 +226,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
         // WINX_STABLE_EVENT_PATCH_END
 
 '''
+
 
     code = (
         code[:match.end()]
@@ -220,11 +236,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
 
 
 # ============================================================
-# 4. PROTECT ONLY showOverlay()
-#
-# IMPORTANT:
-# showOverlayAnimated() is intentionally NOT modified.
-# showRevealZone() is intentionally NOT modified.
+# 4. PROTECT showOverlay()
 # ============================================================
 
 if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
@@ -233,20 +245,24 @@ if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
         r"(private\s+fun\s+showOverlay\s*\([^)]*\)\s*\{)"
     )
 
+
     match = pattern.search(code)
+
 
     if not match:
         raise RuntimeError(
             "showOverlay() not found"
         )
 
-    protection = '''
 
+    protection = r'''
+        
         // WINX_SHOW_OVERLAY_PROTECTION
 
         if (isWinXLauncher) return
 
 '''
+
 
     code = (
         code[:match.end()]
@@ -256,7 +272,141 @@ if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
 
 
 # ============================================================
-# 5. CLOCK + DATE
+# 5. PROTECT showOverlayAnimated()
+#
+# IMPORTANT:
+#
+# Normal/system calls:
+#     showOverlayAnimated()
+#
+# cannot reveal the bar while Win X is active.
+#
+# Reveal Zone:
+#     showOverlayAnimated(true)
+#
+# is explicitly allowed.
+# ============================================================
+
+if "WINX_SHOW_ANIMATED_PROTECTION" not in code:
+
+    # First change the original function signature.
+    pattern = re.compile(
+        r"private\s+fun\s+showOverlayAnimated\s*\(\s*\)\s*\{"
+    )
+
+
+    match = pattern.search(code)
+
+
+    if not match:
+        raise RuntimeError(
+            "showOverlayAnimated() not found"
+        )
+
+
+    new_signature = r'''private fun showOverlayAnimated(
+        allowWinXReveal: Boolean = false
+    ) {'''
+
+
+    code = (
+        code[:match.start()]
+        + new_signature
+        + code[match.end():]
+    )
+
+
+    # Find the newly modified function again.
+    pattern = re.compile(
+        r"(private\s+fun\s+showOverlayAnimated\s*\("
+        r"\s*allowWinXReveal\s*:\s*Boolean\s*=\s*false\s*\)"
+        r"\s*\{)"
+    )
+
+
+    match = pattern.search(code)
+
+
+    if not match:
+        raise RuntimeError(
+            "Modified showOverlayAnimated() not found"
+        )
+
+
+    guard = r'''
+        
+        // WINX_SHOW_ANIMATED_PROTECTION
+
+        if (isWinXLauncher && !allowWinXReveal) {
+            return
+        }
+
+'''
+
+
+    code = (
+        code[:match.end()]
+        + guard
+        + code[match.end():]
+    )
+
+
+# ============================================================
+# 6. ALLOW REVEAL ZONE TO SHOW THE BAR
+#
+# Only the actual Reveal Zone gesture receives:
+#
+#     showOverlayAnimated(true)
+#
+# This preserves the original swipe behavior.
+# ============================================================
+
+if "WINX_REVEAL_ZONE_PATCH" not in code:
+
+    old = '''if (!requireSlide || slideDistance >= slideThreshold) {
+                        showOverlayAnimated()
+'''
+
+
+    new = '''if (!requireSlide || slideDistance >= slideThreshold) {
+
+                        showOverlayAnimated(true)
+
+                        // WINX_REVEAL_ZONE_PATCH
+
+                        if (isWinXLauncher) {
+
+                            autoHideRunnable?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            autoHideRunnable = Runnable {
+                                hideOverlay()
+                            }
+
+                            handler.postDelayed(
+                                autoHideRunnable!!,
+                                10000L
+                            )
+                        }
+'''
+
+
+    if old not in code:
+        raise RuntimeError(
+            "Reveal Zone showOverlayAnimated() call not found"
+        )
+
+
+    code = code.replace(
+        old,
+        new,
+        1
+    )
+
+
+# ============================================================
+# 7. CLOCK + DATE
 # ============================================================
 
 if "WINX_CLOCK_DATE_PATCH" not in code:
@@ -266,17 +416,18 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         code
     )
 
+
     if not match:
         raise RuntimeError(
             "NavigationOverlayService class not found"
         )
 
-    clock_patch = '''
 
+    clock_patch = r'''
+    
     // WINX_CLOCK_DATE_PATCH
 
     private var winXClockTextView: TextView? = null
-
     private var winXDateTextView: TextView? = null
 
     private var winXClockStarted = false
@@ -477,9 +628,11 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         return clockLayout
     }
 
+
     // WINX_CLOCK_DATE_PATCH_END
 
 '''
+
 
     code = (
         code[:match.end()]
@@ -489,10 +642,9 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
 
 # ============================================================
-# 6. ADD CLOCK TO EXISTING CONTAINER
+# 8. ADD CLOCK TO EXISTING NAVIGATION CONTAINER
 #
-# We replace ONLY the original button-order block.
-# Swipe logic remains untouched.
+# Original swipe logic is NOT changed here.
 # ============================================================
 
 if "WINX_CLOCK_LAYOUT_PATCH" not in code:
@@ -505,7 +657,9 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         re.S
     )
 
+
     match = pattern.search(code)
+
 
     if not match:
         raise RuntimeError(
@@ -513,10 +667,9 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         )
 
 
-    replacement = '''container.removeAllViews()
+    replacement = r'''container.removeAllViews()
 
         // WINX_CLOCK_LAYOUT_PATCH
-
 
         val clockRotation =
             when (position) {
@@ -646,6 +799,7 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
              *
              * Clock and Recent Apps stay directly adjacent.
              */
+
             if (
                 !isSpacer &&
                 index < order.size - 1
@@ -692,12 +846,13 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
 
 
 # ============================================================
-# 7. CONTAINER GRAVITY
+# 9. CONTAINER GRAVITY
 # ============================================================
 
 if "WINX_CLOCK_GRAVITY_PATCH" not in code:
 
     old = "container.gravity = Gravity.CENTER"
+
 
     new = '''container.gravity =
             if (isVerticalBar)
@@ -706,6 +861,7 @@ if "WINX_CLOCK_GRAVITY_PATCH" not in code:
                 Gravity.CENTER_VERTICAL
 
         // WINX_CLOCK_GRAVITY_PATCH'''
+
 
     if old in code:
 
@@ -723,7 +879,7 @@ if "WINX_CLOCK_GRAVITY_PATCH" not in code:
 
 
 # ============================================================
-# 8. CLOCK CLEANUP
+# 10. CLOCK CLEANUP
 # ============================================================
 
 if "WINX_CLOCK_CLEANUP_PATCH" not in code:
@@ -732,26 +888,31 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
         r"(override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)"
     )
 
+
     if match:
 
-        cleanup = '''
-
+        cleanup = r'''
+        
         // WINX_CLOCK_CLEANUP_PATCH
 
         handler.removeCallbacks(
             winXClockRunnable
         )
 
+
         winXClockStarted =
             false
 
+
         winXClockTextView =
             null
+
 
         winXDateTextView =
             null
 
 '''
+
 
         code = (
             code[:match.end()]
@@ -761,7 +922,7 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
 
 
 # ============================================================
-# 9. SAVE
+# 11. SAVE
 # ============================================================
 
 with open(path, "w", encoding="utf-8") as f:
@@ -781,6 +942,11 @@ print("  Outside Win X -> FORCE SHOW")
 print("  Detection     -> rootInActiveWindow")
 print("  Delay         -> 250ms")
 print("")
+print("Reveal Zone:")
+print("  Swipe preserved")
+print("  Win X reveal  -> allowed")
+print("  Auto hide     -> 10 seconds")
+print("")
 print("Clock:")
 print("  Time          -> 9sp")
 print("  Date          -> 6sp")
@@ -791,10 +957,10 @@ print("Layout:")
 print("  Back | Home | SPACE | Clock | Recent")
 print("  Swapped: Recent | Clock | SPACE | Home | Back")
 print("")
-print("IMPORTANT:")
-print("  showOverlayAnimated() NOT modified")
-print("  showRevealZone() NOT modified")
-print("  Original swipe logic preserved")
+print("Protection:")
+print("  showOverlay() protected")
+print("  showOverlayAnimated() protected")
+print("  Reveal Zone bypass preserved")
 print("")
 print("================================================")
 print("PATCH COMPLETE")
