@@ -73,7 +73,7 @@ if "WINX_STABLE_PATCH" not in code:
             "NavigationOverlayService class not found"
         )
 
-    insert = """
+    insert = '''
 
     // WINX_STABLE_PATCH
 
@@ -180,7 +180,7 @@ if "WINX_STABLE_PATCH" not in code:
 
     // WINX_STABLE_PATCH_END
 
-"""
+'''
 
     code = (
         code[:match.end()]
@@ -206,7 +206,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
             "onAccessibilityEvent not found"
         )
 
-    patch = """
+    patch = '''
 
         // WINX_STABLE_EVENT_PATCH
 
@@ -214,7 +214,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
 
         // WINX_STABLE_EVENT_PATCH_END
 
-"""
+'''
 
     code = (
         code[:match.end()]
@@ -256,11 +256,11 @@ def protect_function(name):
 
         code = (
             code[:start]
-            + """
+            + '''
 
         if (isWinXLauncher) return
 
-"""
+'''
             + code[start:]
         )
 
@@ -280,7 +280,7 @@ if "WINX_REVEAL_ARGUMENT_PATCH" not in code:
         r"if\s*\(\s*overlayView\s*==\s*null\s*\|\|\s*!isHidden\s*\)\s*return"
     )
 
-    replacement = """private fun showOverlayAnimated(
+    replacement = '''private fun showOverlayAnimated(
         allowWinXReveal: Boolean = false
     ) {
         if (overlayView == null || !isHidden) return
@@ -288,7 +288,7 @@ if "WINX_REVEAL_ARGUMENT_PATCH" not in code:
         if (isWinXLauncher && !allowWinXReveal) return
 
         // WINX_REVEAL_ARGUMENT_PATCH
-"""
+'''
 
     if not pattern.search(code):
         raise RuntimeError(
@@ -318,7 +318,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             "NavigationOverlayService class not found"
         )
 
-    clock_code = """
+    clock_code = '''
 
     // WINX_CLOCK_DATE_PATCH
 
@@ -411,7 +411,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         clock.isSingleLine =
             true
 
-        // Reduced to match the navigation icons.
         clock.textSize =
             10f
 
@@ -437,7 +436,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         date.isSingleLine =
             true
 
-        // Reduced to match the navigation icons.
         date.textSize =
             7f
 
@@ -497,7 +495,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
     // WINX_CLOCK_DATE_PATCH_END
 
-"""
+'''
 
     code = (
         code[:match.end()]
@@ -527,7 +525,7 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
             "Original navigation layout block not found"
         )
 
-    replacement = """container.removeAllViews()
+    replacement = '''container.removeAllViews()
 
 
     /*
@@ -545,9 +543,6 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
         }
 
 
-    /*
-     * Existing clock design and position.
-     */
     val clockView =
         createWinXClock(
             buttonColor,
@@ -566,9 +561,6 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
      * Normal:
      *
      * Back | Home | SPACE | Clock | Recent
-     *
-     * Clock remains directly beside
-     * Recent Apps.
      */
     val spacer =
         View(this)
@@ -696,7 +688,7 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
     }
 
     // WINX_CLOCK_EDGE_LAYOUT_PATCH_END
-"""
+'''
 
     code = (
         code[:match.start()]
@@ -711,11 +703,11 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
 if "WINX_EDGE_GRAVITY_PATCH" not in code:
 
-    old = """
+    old = '''
     container.gravity = Gravity.CENTER
-"""
+'''
 
-    new = """
+    new = '''
     container.gravity =
         if (isVerticalBar)
             Gravity.CENTER_HORIZONTAL
@@ -723,7 +715,7 @@ if "WINX_EDGE_GRAVITY_PATCH" not in code:
             Gravity.CENTER_VERTICAL
 
     // WINX_EDGE_GRAVITY_PATCH
-"""
+'''
 
     if old in code:
 
@@ -759,7 +751,7 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
             "showRevealZone function not found"
         )
 
-    replacement = """private fun showRevealZone() {
+    replacement = '''private fun showRevealZone() {
 
     // WINX_REVEAL_ZONE_PATCH
 
@@ -918,4 +910,131 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
 
 
     val params =
-        WindowMana
+        WindowManager.LayoutParams(
+            if (isVerticalBar)
+                zoneThickness
+            else
+                WindowManager.LayoutParams.MATCH_PARENT,
+
+            if (isVerticalBar)
+                WindowManager.LayoutParams.MATCH_PARENT
+            else
+                zoneThickness,
+
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+
+            PixelFormat.TRANSLUCENT
+        )
+
+
+    when (position) {
+
+        "left" -> {
+
+            params.gravity =
+                Gravity.START or
+                Gravity.CENTER_VERTICAL
+        }
+
+        "right" -> {
+
+            params.gravity =
+                Gravity.END or
+                Gravity.CENTER_VERTICAL
+        }
+
+        else -> {
+
+            params.gravity =
+                Gravity.BOTTOM or
+                Gravity.CENTER_HORIZONTAL
+        }
+    }
+
+
+    revealZone =
+        zone
+
+
+    windowManager.addView(
+        zone,
+        params
+    )
+
+
+    zone.visibility =
+        if (isHidden)
+            View.VISIBLE
+        else
+            View.GONE
+
+
+    // WINX_REVEAL_ZONE_PATCH_END
+}
+'''
+
+    code = (
+        code[:match.start()]
+        + replacement
+        + code[match.end():]
+    )
+
+
+# ============================================================
+# 10. CLOCK CLEANUP
+# ============================================================
+
+if "WINX_CLOCK_DESTROY_PATCH" not in code:
+
+    marker = "override fun onDestroy()"
+
+    if marker in code:
+
+        code = code.replace(
+            marker,
+            '''override fun onDestroy() {
+
+        // WINX_CLOCK_DESTROY_PATCH
+
+        handler.removeCallbacks(
+            winXClockRunnable
+        )
+
+        winXClockStarted = false
+
+''',
+            1
+        )
+
+    else:
+
+        print(
+            "Warning: onDestroy not found"
+        )
+
+
+# ============================================================
+# WRITE FILE
+# ============================================================
+
+with open(
+    path,
+    "w",
+    encoding="utf-8"
+) as f:
+
+    f.write(code)
+
+
+print("==============================================")
+print("WinX patch applied successfully.")
+print("Clock: 10sp")
+print("Date: 7sp")
+print("Clock width: 50dp")
+print("Clock beside Recent Apps: YES")
+print("Reveal swipe preserved.")
+print("==============================================")
