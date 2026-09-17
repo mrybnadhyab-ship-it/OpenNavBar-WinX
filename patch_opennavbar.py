@@ -7,37 +7,20 @@ if len(sys.argv) != 2:
 
 path = sys.argv[1]
 
-with open(path, "r", encoding="utf-8-sig") as f:
+with open(path, "r", encoding="utf-8") as f:
     code = f.read()
 
-
-# ============================================================
-# 0. CLEAN BROKEN IMPORTS
-# ============================================================
-
-broken_imports = [
-    "java.util.Locale",
-    "java.text.SimpleDateFormat",
-    "java.util.Date",
-    "android.graphics.Typeface",
-    "android.widget.TextView",
-]
-
-for broken in broken_imports:
-    code = re.sub(
-        r"(?m)^[ \t]*" + re.escape(broken) + r"[ \t]*\r?\n",
-        "",
-        code
-    )
+WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
 
 # ============================================================
-# 1. IMPORTS
+# 0. IMPORTS
 # ============================================================
 
 imports = [
     "import android.graphics.Typeface",
     "import android.widget.TextView",
+    "import android.view.MotionEvent",
     "import java.text.SimpleDateFormat",
     "import java.util.Date",
     "import java.util.Locale",
@@ -58,7 +41,7 @@ for imp in imports:
 
 
 # ============================================================
-# 2. WIN X STABLE PATCH
+# 1. WIN X STABLE PATCH
 # ============================================================
 
 if "WINX_STABLE_PATCH" not in code:
@@ -73,7 +56,7 @@ if "WINX_STABLE_PATCH" not in code:
             "NavigationOverlayService class not found"
         )
 
-    insert = '''
+    insert = f'''
 
     // WINX_STABLE_PATCH
 
@@ -82,78 +65,78 @@ if "WINX_STABLE_PATCH" not in code:
     private var winXCheckRunnable: Runnable? = null
 
 
-    private fun getCurrentForegroundPackage(): String {
-        return try {
+    private fun getCurrentForegroundPackage(): String {{
+        return try {{
             rootInActiveWindow?.packageName?.toString() ?: ""
-        } catch (e: Exception) {
+        }} catch (e: Exception) {{
             ""
-        }
-    }
+        }}
+    }}
 
 
-    private fun checkWinXStateDelayed() {
+    private fun checkWinXStateDelayed() {{
 
-        winXCheckRunnable?.let {
+        winXCheckRunnable?.let {{
             handler.removeCallbacks(it)
-        }
+        }}
 
-        winXCheckRunnable = Runnable {
+        winXCheckRunnable = Runnable {{
 
             val currentPackage =
                 getCurrentForegroundPackage()
 
             if (
                 currentPackage ==
-                "com.InternityLabs.Launcher.WinX"
-            ) {
+                "{WINX_PACKAGE}"
+            ) {{
 
-                if (!isWinXLauncher) {
+                if (!isWinXLauncher) {{
 
                     isWinXLauncher = true
 
-                    navBarCheckRunnable?.let {
+                    navBarCheckRunnable?.let {{
                         handler.removeCallbacks(it)
-                    }
+                    }}
 
-                    insetsDebounce?.let {
+                    insetsDebounce?.let {{
                         handler.removeCallbacks(it)
-                    }
+                    }}
 
-                    autoHideRunnable?.let {
+                    autoHideRunnable?.let {{
                         handler.removeCallbacks(it)
-                    }
+                    }}
 
                     hideOverlay()
-                }
+                }}
 
-            } else {
+            }} else {{
 
-                if (isWinXLauncher) {
+                if (isWinXLauncher) {{
 
                     isWinXLauncher = false
 
                     forceShowAfterWinX()
-                }
-            }
-        }
+                }}
+            }}
+        }}
 
         handler.postDelayed(
             winXCheckRunnable!!,
             250
         )
-    }
+    }}
 
 
-    private fun forceShowAfterWinX() {
+    private fun forceShowAfterWinX() {{
 
         val view =
             overlayView ?: return
 
         view.animate().cancel()
 
-        autoHideRunnable?.let {
+        autoHideRunnable?.let {{
             handler.removeCallbacks(it)
-        }
+        }}
 
         autoHideRunnable = null
 
@@ -176,7 +159,7 @@ if "WINX_STABLE_PATCH" not in code:
             false
 
         disableRevealZoneTouch()
-    }
+    }}
 
     // WINX_STABLE_PATCH_END
 
@@ -190,7 +173,7 @@ if "WINX_STABLE_PATCH" not in code:
 
 
 # ============================================================
-# 3. WIN X ACCESSIBILITY EVENT
+# 2. ACCESSIBILITY EVENT
 # ============================================================
 
 if "WINX_STABLE_EVENT_PATCH" not in code:
@@ -203,7 +186,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
 
     if not match:
         raise RuntimeError(
-            "onAccessibilityEvent not found"
+            "onAccessibilityEvent(AccessibilityEvent?) not found"
         )
 
     patch = '''
@@ -224,7 +207,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
 
 
 # ============================================================
-# 4. PROTECT NORMAL SHOW ONLY
+# 3. PROTECT NORMAL SHOW OVERLAY
 # ============================================================
 
 def protect_function(name):
@@ -232,7 +215,7 @@ def protect_function(name):
     global code
 
     pattern = re.compile(
-        r"(fun\s+" +
+        r"(private\s+fun\s+" +
         re.escape(name) +
         r"\s*\([^)]*\)\s*\{)"
     )
@@ -249,7 +232,7 @@ def protect_function(name):
     start = match.end()
 
     section = code[
-        start:start + 600
+        start:start + 700
     ]
 
     if "if (isWinXLauncher) return" not in section:
@@ -269,7 +252,8 @@ protect_function("showOverlay")
 
 
 # ============================================================
-# 5. SHOW ANIMATED WITH EXPLICIT WIN X REVEAL
+# 4. SHOW ANIMATED
+#    Allow explicit reveal from edge swipe while inside Win X
 # ============================================================
 
 if "WINX_REVEAL_ARGUMENT_PATCH" not in code:
@@ -281,13 +265,13 @@ if "WINX_REVEAL_ARGUMENT_PATCH" not in code:
     )
 
     replacement = '''private fun showOverlayAnimated(
-        allowWinXReveal: Boolean = false
-    ) {
-        if (overlayView == null || !isHidden) return
+    allowWinXReveal: Boolean = false
+) {
+    if (overlayView == null || !isHidden) return
 
-        if (isWinXLauncher && !allowWinXReveal) return
+    if (isWinXLauncher && !allowWinXReveal) return
 
-        // WINX_REVEAL_ARGUMENT_PATCH
+    // WINX_REVEAL_ARGUMENT_PATCH
 '''
 
     if not pattern.search(code):
@@ -303,7 +287,7 @@ if "WINX_REVEAL_ARGUMENT_PATCH" not in code:
 
 
 # ============================================================
-# 6. CLOCK + DATE
+# 5. CLOCK + DATE
 # ============================================================
 
 if "WINX_CLOCK_DATE_PATCH" not in code:
@@ -411,11 +395,15 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         clock.isSingleLine =
             true
 
+        clock.includeFontPadding =
+            false
+
+        // Windows-like taskbar size
         clock.textSize =
-            10f
+            9f
 
         clock.typeface =
-            Typeface.DEFAULT_BOLD
+            Typeface.DEFAULT
 
         clock.setTextColor(
             buttonColor
@@ -436,8 +424,12 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         date.isSingleLine =
             true
 
+        date.includeFontPadding =
+            false
+
+        // Small Windows-like date
         date.textSize =
-            7f
+            6f
 
         date.typeface =
             Typeface.DEFAULT
@@ -505,7 +497,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
 
 # ============================================================
-# 7. EDGE LAYOUT + CLOCK POSITION
+# 6. EDGE NAVIGATION LAYOUT + CLOCK
 # ============================================================
 
 if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
@@ -528,166 +520,166 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
     replacement = '''container.removeAllViews()
 
 
-    /*
-     * Clock rotation:
-     *
-     * Bottom = normal
-     * Left   = 90 degrees
-     * Right  = -90 degrees
-     */
-    val clockRotation =
-        when (position) {
-            "left" -> 90f
-            "right" -> -90f
-            else -> 0f
-        }
-
-
-    val clockView =
-        createWinXClock(
-            buttonColor,
-            clockRotation
-        )
-
-
-    /*
-     * Clock width = 50dp
-     */
-    val clockWidth =
-        dpToPx(50)
-
-
-    /*
-     * Normal:
-     *
-     * Back | Home | SPACE | Clock | Recent
-     */
-    val spacer =
-        View(this)
-
-
-    val order: List<View> =
-        if (shouldSwap) {
-
-            listOf(
-                recentButton,
-                clockView,
-                spacer,
-                homeButton,
-                backButton
-            )
-
-        } else {
-
-            listOf(
-                backButton,
-                homeButton,
-                spacer,
-                clockView,
-                recentButton
-            )
-        }
-
-
-    order.forEachIndexed { index, item ->
-
-        val isSpacer =
-            item === spacer
-
-
-        val lp =
-            if (isSpacer) {
-
-                if (isVerticalBar) {
-
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        0,
-                        1f
-                    )
-
-                } else {
-
-                    LinearLayout.LayoutParams(
-                        0,
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1f
-                    )
-                }
-
-            } else if (item === clockView) {
-
-                if (isVerticalBar) {
-
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        hitboxSize,
-                        0f
-                    )
-
-                } else {
-
-                    LinearLayout.LayoutParams(
-                        clockWidth,
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        0f
-                    )
-                }
-
-            } else {
-
-                if (isVerticalBar) {
-
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        hitboxSize,
-                        0f
-                    )
-
-                } else {
-
-                    LinearLayout.LayoutParams(
-                        hitboxSize,
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        0f
-                    )
-                }
+        /*
+         * Clock rotation:
+         *
+         * Bottom = normal
+         * Left   = 90 degrees
+         * Right  = -90 degrees
+         */
+        val clockRotation =
+            when (position) {
+                "left" -> 90f
+                "right" -> -90f
+                else -> 0f
             }
+
+
+        val clockView =
+            createWinXClock(
+                buttonColor,
+                clockRotation
+            )
 
 
         /*
-         * No gap between clock and Recent Apps.
+         * Clock width
          */
-        if (!isSpacer && index < order.size - 1) {
+        val clockWidth =
+            dpToPx(50)
 
-            if (isVerticalBar) {
 
-                lp.bottomMargin =
-                    if (item === clockView)
-                        0
-                    else
-                        separation
+        /*
+         * Normal layout:
+         *
+         * Back | Home | SPACE | Clock | Recent
+         */
+        val spacer =
+            View(this)
+
+
+        val order: List<View> =
+            if (shouldSwap) {
+
+                listOf(
+                    recentButton,
+                    clockView,
+                    spacer,
+                    homeButton,
+                    backButton
+                )
 
             } else {
 
-                lp.marginEnd =
-                    if (item === clockView)
-                        0
-                    else
-                        separation
+                listOf(
+                    backButton,
+                    homeButton,
+                    spacer,
+                    clockView,
+                    recentButton
+                )
             }
+
+
+        order.forEachIndexed { index, item ->
+
+            val isSpacer =
+                item === spacer
+
+
+            val lp =
+                if (isSpacer) {
+
+                    if (isVerticalBar) {
+
+                        LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            0,
+                            1f
+                        )
+
+                    } else {
+
+                        LinearLayout.LayoutParams(
+                            0,
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            1f
+                        )
+                    }
+
+                } else if (item === clockView) {
+
+                    if (isVerticalBar) {
+
+                        LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            hitboxSize,
+                            0f
+                        )
+
+                    } else {
+
+                        LinearLayout.LayoutParams(
+                            clockWidth,
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            0f
+                        )
+                    }
+
+                } else {
+
+                    if (isVerticalBar) {
+
+                        LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            hitboxSize,
+                            0f
+                        )
+
+                    } else {
+
+                        LinearLayout.LayoutParams(
+                            hitboxSize,
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            0f
+                        )
+                    }
+                }
+
+
+            /*
+             * No gap between Clock and Recent Apps.
+             */
+            if (!isSpacer && index < order.size - 1) {
+
+                if (isVerticalBar) {
+
+                    lp.bottomMargin =
+                        if (item === clockView)
+                            0
+                        else
+                            separation
+
+                } else {
+
+                    lp.marginEnd =
+                        if (item === clockView)
+                            0
+                        else
+                            separation
+                }
+            }
+
+
+            item.layoutParams =
+                lp
+
+            container.addView(
+                item
+            )
         }
 
-
-        item.layoutParams =
-            lp
-
-        container.addView(
-            item
-        )
-    }
-
-    // WINX_CLOCK_EDGE_LAYOUT_PATCH_END
+        // WINX_CLOCK_EDGE_LAYOUT_PATCH_END
 '''
 
     code = (
@@ -698,23 +690,23 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
 
 # ============================================================
-# 8. CONTAINER GRAVITY
+# 7. CONTAINER GRAVITY
 # ============================================================
 
 if "WINX_EDGE_GRAVITY_PATCH" not in code:
 
     old = '''
-    container.gravity = Gravity.CENTER
+        container.gravity = Gravity.CENTER
 '''
 
     new = '''
-    container.gravity =
-        if (isVerticalBar)
-            Gravity.CENTER_HORIZONTAL
-        else
-            Gravity.CENTER_VERTICAL
+        container.gravity =
+            if (isVerticalBar)
+                Gravity.CENTER_HORIZONTAL
+            else
+                Gravity.CENTER_VERTICAL
 
-    // WINX_EDGE_GRAVITY_PATCH
+        // WINX_EDGE_GRAVITY_PATCH
 '''
 
     if old in code:
@@ -733,7 +725,7 @@ if "WINX_EDGE_GRAVITY_PATCH" not in code:
 
 
 # ============================================================
-# 9. REVEAL ZONE / SWIPE
+# 8. REVEAL ZONE / SWIPE FIX
 # ============================================================
 
 if "WINX_REVEAL_ZONE_PATCH" not in code:
@@ -753,160 +745,394 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
 
     replacement = '''private fun showRevealZone() {
 
-    // WINX_REVEAL_ZONE_PATCH
+        // WINX_REVEAL_ZONE_PATCH
 
-    removeRevealZone()
+        removeRevealZone()
 
-    val position =
-        resolvePosition()
 
-    val isVerticalBar =
-        position == "left" ||
-        position == "right"
+        val position =
+            resolvePosition()
 
-    val thicknessPref =
-        prefs.getInt(
-            "reveal_zone_thickness",
-            20
-        )
 
-    val zoneThickness =
-        dpToPx(
-            maxOf(
-                thicknessPref,
-                12
-            )
-        )
+        val isVerticalBar =
+            position == "left" ||
+            position == "right"
 
-    val zone =
-        FrameLayout(this).apply {
 
-            setBackgroundColor(
-                Color.TRANSPARENT
+        /*
+         * Larger invisible touch area.
+         *
+         * This makes the edge swipe much easier
+         * to trigger on Android / HyperOS.
+         */
+        val thicknessPref =
+            prefs.getInt(
+                "reveal_zone_thickness",
+                20
             )
 
-            setOnTouchListener { _, event ->
 
-                when (event.action) {
+        val zoneThickness =
+            dpToPx(
+                maxOf(
+                    thicknessPref,
+                    12
+                )
+            )
 
-                    MotionEvent.ACTION_DOWN -> {
 
-                        /*
-                         * If Win X is visible, touching the
-                         * reveal edge immediately hides it.
-                         */
-                        if (
-                            isWinXLauncher &&
-                            !isHidden
-                        ) {
+        val zone =
+            FrameLayout(this).apply {
 
-                            overlayView?.animate()?.cancel()
+                setBackgroundColor(
+                    Color.TRANSPARENT
+                )
 
-                            overlayView?.visibility =
-                                View.GONE
+                isClickable =
+                    true
 
-                            overlayView?.alpha =
-                                0f
+                isFocusable =
+                    false
 
-                            overlayView?.translationX =
-                                0f
 
-                            overlayView?.translationY =
-                                0f
+                setOnTouchListener { _, event ->
 
-                            isHidden =
-                                true
-                        }
+                    when (event.actionMasked) {
 
-                        touchStartX =
-                            event.rawX
+                        MotionEvent.ACTION_DOWN -> {
 
-                        touchStartY =
-                            event.rawY
+                            touchStartX =
+                                event.rawX
 
-                        true
-                    }
+                            touchStartY =
+                                event.rawY
 
-                    MotionEvent.ACTION_UP -> {
-
-                        val requireSlide =
-                            prefs.getBoolean(
-                                "require_slide_gesture",
-                                true
-                            )
-
-                        val deltaX =
-                            event.rawX -
-                            touchStartX
-
-                        val deltaY =
-                            touchStartY -
-                            event.rawY
-
-                        val slideDistance =
-                            when (position) {
-
-                                "left" ->
-                                    deltaX
-
-                                "right" ->
-                                    -deltaX
-
-                                else ->
-                                    deltaY
-                            }
-
-                        val requiredDistance =
-                            maxOf(
-                                slideThreshold,
-                                dpToPx(15)
-                            )
-
-                        if (
-                            !requireSlide ||
-                            slideDistance >= requiredDistance
-                        ) {
 
                             /*
-                             * Explicitly allow the reveal
-                             * while Win X is active.
+                             * Important:
+                             *
+                             * When Win X is currently visible,
+                             * touching the edge hides the bar.
+                             *
+                             * The user can then immediately
+                             * swipe from the edge to reveal it.
                              */
-                            showOverlayAnimated(
-                                true
-                            )
-
                             if (
-                                checkIsKeyboardVisible() &&
-                                prefs.getBoolean(
-                                    "auto_hide_enabled",
-                                    false
-                                )
+                                isWinXLauncher &&
+                                !isHidden
                             ) {
 
-                                autoHideRunnable?.let {
-                                    handler.removeCallbacks(it)
-                                }
+                                overlayView?.animate()?.cancel()
 
-                                autoHideRunnable =
-                                    Runnable {
-                                        hideOverlay()
-                                    }
+                                overlayView?.visibility =
+                                    View.GONE
 
-                                handler.postDelayed(
-                                    autoHideRunnable!!,
-                                    prefs.getInt(
-                                        "auto_hide_delay",
-                                        3000
-                                    ).toLong()
-                                )
+                                overlayView?.alpha =
+                                    0f
+
+                                overlayView?.translationX =
+                                    0f
+
+                                overlayView?.translationY =
+                                    0f
+
+                                isHidden =
+                                    true
+
+                                enableRevealZoneTouch()
                             }
+
+                            true
                         }
 
-                        true
-                    }
 
-                    MotionEvent.ACTION_CANCEL -> {
-                        true
-                    }
+                        MotionEvent.ACTION_UP -> {
 
-                    else -> {
+                            val requireSlide =
+                                prefs.getBoolean(
+                                    "require_slide_gesture",
+                                    true
+                                )
+
+
+                            val currentPosition =
+                                resolvePosition()
+
+
+                            val deltaX =
+                                event.rawX -
+                                touchStartX
+
+
+                            val deltaY =
+                                touchStartY -
+                                event.rawY
+
+
+                            /*
+                             * Calculate movement according
+                             * to the edge position.
+                             */
+                            val slideDistance =
+                                when (currentPosition) {
+
+                                    "left" ->
+                                        deltaX
+
+                                    "right" ->
+                                        -deltaX
+
+                                    "top" ->
+                                        event.rawY - touchStartY
+
+                                    else ->
+                                        deltaY
+                                }
+
+
+                            /*
+                             * Minimum swipe distance.
+                             *
+                             * Uses the user setting but never
+                             * goes below 15dp.
+                             */
+                            val requiredDistance =
+                                maxOf(
+                                    slideThreshold,
+                                    dpToPx(15)
+                                )
+
+
+                            val validSwipe =
+                                !requireSlide ||
+                                slideDistance >= requiredDistance
+
+
+                            if (validSwipe) {
+
+                                /*
+                                 * Explicitly allow the overlay
+                                 * to appear while Win X is active.
+                                 */
+                                showOverlayAnimated(
+                                    true
+                                )
+
+
+                                /*
+                                 * If keyboard is visible and
+                                 * auto-hide is enabled, keep the
+                                 * original temporary-hide behavior.
+                                 */
+                                if (
+                                    checkIsKeyboardVisible() &&
+                                    prefs.getBoolean(
+                                        "auto_hide_enabled",
+                                        false
+                                    )
+                                ) {
+
+                                    autoHideRunnable?.let {
+                                        handler.removeCallbacks(it)
+                                    }
+
+
+                                    autoHideRunnable =
+                                        Runnable {
+                                            hideOverlay()
+                                        }
+
+
+                                    handler.postDelayed(
+                                        autoHideRunnable!!,
+                                        prefs.getInt(
+                                            "auto_hide_delay",
+                                            3000
+                                        ).toLong()
+                                    )
+                                }
+                            }
+
+
+                            true
+                        }
+
+
+                        MotionEvent.ACTION_CANCEL -> {
+
+                            true
+                        }
+
+
+                        else -> {
+
+                            true
+                        }
+                    }
+                }
+            }
+
+
+        revealZoneView =
+            zone
+
+
+        val params =
+            WindowManager.LayoutParams(
+
+                if (isVerticalBar)
+                    zoneThickness
+                else
+                    WindowManager.LayoutParams.MATCH_PARENT,
+
+
+                if (!isVerticalBar)
+                    zoneThickness
+                else
+                    WindowManager.LayoutParams.MATCH_PARENT,
+
+
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+
+
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+
+
+                PixelFormat.TRANSLUCENT
+            )
+
+
+        when (position) {
+
+            "left" -> {
+                params.gravity =
+                    Gravity.LEFT or
+                    Gravity.CENTER_VERTICAL
+            }
+
+
+            "right" -> {
+                params.gravity =
+                    Gravity.RIGHT or
+                    Gravity.CENTER_VERTICAL
+            }
+
+
+            "top" -> {
+                params.gravity =
+                    Gravity.TOP or
+                    Gravity.CENTER_HORIZONTAL
+            }
+
+
+            else -> {
+                params.gravity =
+                    Gravity.BOTTOM or
+                    Gravity.CENTER_HORIZONTAL
+            }
+        }
+
+
+        /*
+         * When overlay is visible,
+         * the invisible reveal zone must NOT intercept touches.
+         */
+        if (!isHidden) {
+
+            params.flags =
+                params.flags or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+
+
+        windowManager.addView(
+            revealZoneView,
+            params
+        )
+
+        // WINX_REVEAL_ZONE_PATCH_END
+    }
+
+'''
+
+    code = (
+        code[:match.start()]
+        + replacement
+        + code[match.end():]
+    )
+
+
+# ============================================================
+# 9. CLOCK CLEANUP
+# ============================================================
+
+if "WINX_CLOCK_CLEANUP_PATCH" not in code:
+
+    pattern = re.compile(
+        r"(override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)"
+    )
+
+    match = pattern.search(code)
+
+    if match:
+
+        cleanup = '''
+
+        // WINX_CLOCK_CLEANUP_PATCH
+
+        handler.removeCallbacks(
+            winXClockRunnable
+        )
+
+        winXClockStarted = false
+
+'''
+
+        code = (
+            code[:match.end()]
+            + cleanup
+            + code[match.end():]
+        )
+
+
+# ============================================================
+# 10. SAVE
+# ============================================================
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(code)
+
+
+print("================================================")
+print(" OpenNavBar Win X PATCH")
+print("================================================")
+print("Win X package:", WINX_PACKAGE)
+print("")
+print("Win X detection:")
+print("  rootInActiveWindow")
+print("  delay: 250ms")
+print("")
+print("Win X behavior:")
+print("  Inside Win X  -> HIDE")
+print("  Outside Win X -> FORCE SHOW")
+print("")
+print("Clock:")
+print("  Windows-like taskbar size")
+print("  Time: 9sp")
+print("  Date: 6sp")
+print("  Clock width: 50dp")
+print("")
+print("Navigation layout:")
+print("  Back | Home | SPACE | Clock | Recent")
+print("")
+print("Swipe:")
+print("  Reveal zone: minimum 12dp")
+print("  Default: 20dp")
+print("  Minimum swipe: 15dp")
+print("  Win X reveal explicitly allowed")
+print("")
+print("================================================")
+print("PATCH COMPLETE")
+print("================================================")
