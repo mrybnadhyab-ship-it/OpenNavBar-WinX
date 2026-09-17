@@ -791,6 +791,10 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
 
                     MotionEvent.ACTION_DOWN -> {
 
+                        /*
+                         * If Win X is visible, touching the
+                         * reveal edge immediately hides it.
+                         */
                         if (
                             isWinXLauncher &&
                             !isHidden
@@ -863,6 +867,10 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
                             slideDistance >= requiredDistance
                         ) {
 
+                            /*
+                             * Explicitly allow the reveal
+                             * while Win X is active.
+                             */
                             showOverlayAnimated(
                                 true
                             )
@@ -902,139 +910,3 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
                     }
 
                     else -> {
-                        true
-                    }
-                }
-            }
-        }
-
-
-    val params =
-        WindowManager.LayoutParams(
-            if (isVerticalBar)
-                zoneThickness
-            else
-                WindowManager.LayoutParams.MATCH_PARENT,
-
-            if (isVerticalBar)
-                WindowManager.LayoutParams.MATCH_PARENT
-            else
-                zoneThickness,
-
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-
-            PixelFormat.TRANSLUCENT
-        )
-
-
-    when (position) {
-
-        "left" -> {
-
-            params.gravity =
-                Gravity.START or
-                Gravity.CENTER_VERTICAL
-        }
-
-        "right" -> {
-
-            params.gravity =
-                Gravity.END or
-                Gravity.CENTER_VERTICAL
-        }
-
-        else -> {
-
-            params.gravity =
-                Gravity.BOTTOM or
-                Gravity.CENTER_HORIZONTAL
-        }
-    }
-
-
-    revealZone =
-        zone
-
-
-    windowManager.addView(
-        zone,
-        params
-    )
-
-
-    zone.visibility =
-        if (isHidden)
-            View.VISIBLE
-        else
-            View.GONE
-
-
-    // WINX_REVEAL_ZONE_PATCH_END
-}
-'''
-
-    code = (
-        code[:match.start()]
-        + replacement
-        + code[match.end():]
-    )
-
-
-# ============================================================
-# 10. CLOCK CLEANUP
-# ============================================================
-
-if "WINX_CLOCK_DESTROY_PATCH" not in code:
-
-    marker = "override fun onDestroy()"
-
-    if marker in code:
-
-        code = code.replace(
-            marker,
-            '''override fun onDestroy() {
-
-        // WINX_CLOCK_DESTROY_PATCH
-
-        handler.removeCallbacks(
-            winXClockRunnable
-        )
-
-        winXClockStarted = false
-
-''',
-            1
-        )
-
-    else:
-
-        print(
-            "Warning: onDestroy not found"
-        )
-
-
-# ============================================================
-# WRITE FILE
-# ============================================================
-
-with open(
-    path,
-    "w",
-    encoding="utf-8"
-) as f:
-
-    f.write(code)
-
-
-print("==============================================")
-print("WinX patch applied successfully.")
-print("Clock: 10sp")
-print("Date: 7sp")
-print("Clock width: 50dp")
-print("Clock beside Recent Apps: YES")
-print("Reveal swipe preserved.")
-print("==============================================")
