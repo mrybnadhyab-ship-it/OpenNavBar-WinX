@@ -336,7 +336,8 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
                 try {
 
-                    val now = Date()
+                    val now =
+                        Date()
 
                     val timeText =
                         SimpleDateFormat(
@@ -344,8 +345,14 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
                             Locale.ENGLISH
                         )
                             .format(now)
-                            .replace("AM", "ص")
-                            .replace("PM", "م")
+                            .replace(
+                                "AM",
+                                "ص"
+                            )
+                            .replace(
+                                "PM",
+                                "م"
+                            )
 
                     val dateText =
                         SimpleDateFormat(
@@ -393,6 +400,12 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
         )
 
 
+        /*
+         * CLOCK
+         *
+         * Reduced only to match
+         * the navigation icon size better.
+         */
         val clock =
             TextView(this)
 
@@ -403,7 +416,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             true
 
         clock.textSize =
-            13f
+            10f
 
         clock.typeface =
             Typeface.DEFAULT_BOLD
@@ -416,6 +429,12 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             textRotation
 
 
+        /*
+         * DATE
+         *
+         * Reduced only to match
+         * the navigation icon size better.
+         */
         val date =
             TextView(this)
 
@@ -426,7 +445,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
             true
 
         date.textSize =
-            8f
+            7f
 
         date.typeface =
             Typeface.DEFAULT
@@ -446,6 +465,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
+
 
         layout.addView(
             date,
@@ -493,7 +513,7 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
 
 # ============================================================
-# 7. EDGE LAYOUT
+# 7. EDGE LAYOUT + CLOCK POSITION
 # ============================================================
 
 if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
@@ -531,6 +551,9 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
         }
 
 
+    /*
+     * Existing clock design and position.
+     */
     val clockView =
         createWinXClock(
             buttonColor,
@@ -546,17 +569,12 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
 
     /*
-     * Flexible spacer keeps the two sides
-     * separated.
-     *
      * Normal:
      *
      * Back | Home | SPACE | Clock | Recent
      *
-     * Therefore:
-     * Back = left edge
-     * Recent = right edge
-     * Clock touches Recent
+     * Clock remains directly beside
+     * Recent Apps.
      */
     val spacer =
         View(this)
@@ -652,7 +670,7 @@ if "WINX_CLOCK_EDGE_LAYOUT_PATCH" not in code:
 
 
         /*
-         * Keep clock directly beside Recent Apps.
+         * No gap between clock and Recent Apps.
          */
         if (!isSpacer && index < order.size - 1) {
 
@@ -729,7 +747,7 @@ if "WINX_EDGE_GRAVITY_PATCH" not in code:
 
 
 # ============================================================
-# 9. KEEP REVEAL ZONE / SWIPE PATCH
+# 9. REVEAL ZONE / SWIPE
 # ============================================================
 
 if "WINX_REVEAL_ZONE_PATCH" not in code:
@@ -898,24 +916,4 @@ if "WINX_REVEAL_ZONE_PATCH" not in code:
                     }
 
                     else -> {
-                        true
-                    }
-                }
-            }
-        }
-
-    revealZoneView =
-        zone
-
-    val params =
-        WindowManager.LayoutParams(
-
-            if (isVerticalBar)
-                zoneThickness
-            else
-                WindowManager.LayoutParams.MATCH_PARENT,
-
-            if (isVerticalBar)
-                WindowManager.LayoutParams.MATCH_PARENT
-            else
-         
+          
