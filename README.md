@@ -1,21 +1,12 @@
-# OpenNavBar — Win X edition
+# OpenNavBar WinX
 
-هذه الحزمة مجهزة للبناء عبر GitHub Actions.
+GitHub Actions project for building a WinX-modified OpenNavBar APK.
 
-التعديل المقصود:
-- داخل Win X Launcher يتم إخفاء OpenNavBar.
-- عند مغادرة Win X إلى Facebook أو MiXplorer أو أي تطبيق آخر يظهر OpenNavBar.
-- لا يتم تغيير إعدادات Gesture Navigation نفسها.
+## Build
+1. Upload these files to the root of a GitHub repository.
+2. Open **Actions**.
+3. Select **Build OpenNavBar WinX**.
+4. Press **Run workflow**.
+5. Download the artifact `OpenNavBar-WinX-debug`.
 
-## البناء
-1. أنشئ مستودعًا جديدًا على GitHub.
-2. ارفع محتويات هذه الحزمة.
-3. افتح Actions.
-4. اختر Build OpenNavBar WinX edition.
-5. اضغط Run workflow.
-6. بعد نجاح البناء حمّل Artifact باسم OpenNavBar-WinX-debug.
-7. فك الضغط وثبّت APK.
-
-الـ debug APK يكون موقعًا بمفتاح debug تلقائيًا، لذلك يصلح للاختبار والتثبيت المباشر عادةً.
-
-ملاحظة: التعديل يعتمد على بنية OpenNavBar الحالية؛ إذا تغيرت أسماء الدوال في المصدر قد يحتاج patch إلى تحديث.
+The patch script is `patch_opennavbar.py`.
