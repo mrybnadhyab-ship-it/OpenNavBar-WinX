@@ -1,224 +1,4 @@
-#!/usr/bin/env python3
-from pathlib import Path
-import re
-import sys
-
-WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
-
-if len(sys.argv) >= 2:
-    SOURCE = Path(sys.argv[1])
-else:
-    SOURCE = Path("opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt")
-
-
-def fail(msg):
-    print("ERROR:", msg)
-    sys.exit(1)
-
-
-def find_matching_brace(text, opening_pos):
-    depth = 0
-    in_string = False
-    in_char = False
-    escape = False
-    for i in range(opening_pos, len(text)):
-        c = text[i]
-        if in_string:
-            if escape:
-                escape = False
-            elif c == "\\":
-                escape = True
-            elif c == '"':
-                in_string = False
-        elif in_char:
-            if escape:
-                escape = False
-            elif c == "\\":
-                escape = True
-            elif c == "'":
-                in_char = False
-        else:
-            if c == '"':
-                in_string = True
-            elif c == "'":
-                in_char = True
-            elif c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    return i
-    return -1
-
-
-def find_function(text, signature):
-    start = text.find(signature)
-    if start < 0:
-        return None
-    brace = text.find("{", start)
-    if brace < 0:
-        return None
-    end = find_matching_brace(text, brace)
-    if end < 0:
-        return None
-    return start, brace, end
-
-
-def add_import(text, line):
-    if line in text:
-        return text
-    positions = [m.start() for m in re.finditer(r"^import ", text, re.MULTILINE)]
-    if not positions:
-        return text
-    last = positions[-1]
-    eol = text.find("\n", last)
-    if eol < 0:
-        eol = len(text)
-    return text[:eol + 1] + line + "\n" + text[eol + 1:]
-
-
-if not SOURCE.exists():
-    fail("Source file not found: " + str(SOURCE))
-
-code = SOURCE.read_text(encoding="utf-8")
-
-# ------------------------------------------------------------
-# Imports
-# ------------------------------------------------------------
-for imp in [
-    "import android.graphics.Typeface",
-    "import android.widget.TextView",
-    "import android.view.accessibility.AccessibilityNodeInfo",
-    "import java.text.SimpleDateFormat",
-    "import java.util.Date",
-    "import java.util.Locale",
-]:
-    code = add_import(code, imp)
-
-# ------------------------------------------------------------
-# Top-level WinX constant
-# ------------------------------------------------------------
-if "WINX_PACKAGE_PATCH_CONSTANT" not in code:
-    marker = "class NavigationOverlayService"
-    pos = code.find(marker)
-    if pos < 0:
-        fail("NavigationOverlayService class not found")
-    const = 'private const val WINX_PACKAGE_PATCH_CONSTANT = "com.InternityLabs.Launcher.WinX"\n\n'
-    code = code[:pos] + const + code[pos:]
-
-# ------------------------------------------------------------
-# State variables
-# ------------------------------------------------------------
-if "WINX_PATCH_STATE" not in code:
-    marker = "class NavigationOverlayService"
-    pos = code.find(marker)
-    brace = code.find("{", pos)
-    if brace < 0:
-        fail("Class opening brace not found")
-    block = """
-    // ========================================================
-    // WINX_PATCH_STATE
-    // ========================================================
-
-    private var isWinXLauncher = false
-
-    private val winXCheckRunnable = Runnable {
-        try {
-            updateWinXState(getCurrentForegroundPackage())
-        } catch (_: Exception) {
-        }
-    }
-
-    private var winXClockView: TextView? = null
-    private var winXClockRunnable: Runnable? = null
-    private var winXClockHandler: Handler? = null
-
-"""
-    code = code[:brace + 1] + block + code[brace + 1:]
-
-# ------------------------------------------------------------
-# Helper functions
-# ------------------------------------------------------------
-if "WINX_PATCH_HELPERS" not in code:
-    marker = "    // ========================================================\n    // WINX_PATCH_STATE"
-    pos = code.find(marker)
-    if pos < 0:
-        fail("WINX state marker not found")
-    helpers = """
-    // ========================================================
-    // WINX_PATCH_HELPERS
-    // ========================================================
-
-    private fun getCurrentForegroundPackage(): String? {
-        try {
-            val active = windows.firstOrNull {
-                try {
-                    it.isActive || it.isFocused
-                } catch (_: Exception) {
-                    false
-                }
-            }
-            if (active != null) {
-                val pkg = active.root?.packageName?.toString()
-                if (!pkg.isNullOrEmpty()) return pkg
-            }
-        } catch (_: Exception) {
-        }
-
-        try {
-            return rootInActiveWindow?.packageName?.toString()
-        } catch (_: Exception) {
-        }
-        return null
-    }
-
-    private fun updateWinXState(packageName: String?) {
-        val wasWinX = isWinXLauncher
-        isWinXLauncher = packageName == WINX_PACKAGE_PATCH_CONSTANT
-
-        if (isWinXLauncher && !wasWinX) {
-            try { hideOverlay() } catch (_: Exception) { }
-        }
-
-        if (!isWinXLauncher && wasWinX) {
-            try { showOverlayAnimated() } catch (_: Exception) { }
-        }
-    }
-
-    private fun checkWinXStateDelayed() {
-        try {
-            handler.removeCallbacks(winXCheckRunnable)
-            handler.postDelayed(winXCheckRunnable, 150)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun clickWinXStartButton(): Boolean {
-        try {
-            val root = rootInActiveWindow ?: return false
-            val byText = try {
-                root.findAccessibilityNodeInfosByText("Start")
-            } catch (_: Exception) {
-                emptyList()
-            }
-
-            for (node in byText) {
-                try {
-                    if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
-                    node.parent?.let { p ->
-                        if (p.isClickable && p.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
-                    }
-                } catch (_: Exception) { }
-            }
-
-            val queue = ArrayDeque<AccessibilityNodeInfo>()
-            queue.add(root)
-            while (queue.isNotEmpty()) {
-                val node = queue.removeFirst()
-                try {
-                    val text = node.text?.toString()?.lowercase(Locale.getDefault()) ?: ""
-                    val desc = node.contentDescription?.toString()?.lowercase(Locale.getDefault()) ?: ""
-                    val id = node.viewIdResourceName?.lowercase(Locale.getDefault()) ?: ""
+case(Locale.getDefault()) ?: ""
                     val isStart = text == "start" || desc == "start" || id.contains("start")
 
                     if (isStart) {
@@ -473,3 +253,584 @@ print("MiXplorer stability: OK")
 print("Long press Home -> WinX Start: OK")
 print("Clock/date: OK")
 print("==============================================")
+import sys
+import re
+
+if len(sys.argv) != 2:
+    print("Usage: python3 patch_opennavbar.py <NavigationOverlayService.kt>")
+    sys.exit(1)
+
+path = sys.argv[1]
+
+with open(path, "r", encoding="utf-8") as f:
+    code = f.read()
+
+WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
+
+
+def find_matching_brace(text, open_pos):
+    depth = 0
+    in_string = False
+    in_char = False
+    in_line_comment = False
+    in_block_comment = False
+    escape = False
+    i = open_pos
+
+    while i < len(text):
+        c = text[i]
+        n = text[i + 1] if i + 1 < len(text) else ""
+
+        if in_line_comment:
+            if c == "\n":
+                in_line_comment = False
+        elif in_block_comment:
+            if c == "*" and n == "/":
+                in_block_comment = False
+                i += 1
+        elif in_string:
+            if escape:
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == '"':
+                in_string = False
+        elif in_char:
+            if escape:
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == "'":
+                in_char = False
+        else:
+            if c == "/" and n == "/":
+                in_line_comment = True
+                i += 1
+            elif c == "/" and n == "*":
+                in_block_comment = True
+                i += 1
+            elif c == '"':
+                in_string = True
+            elif c == "'":
+                in_char = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+
+    return -1
+
+
+def find_function(text, name):
+    m = re.search(
+        rf"private\s+fun\s+{re.escape(name)}\s*\([^)]*\)\s*\{",
+        text,
+    )
+    if not m:
+        return None
+
+    open_pos = text.find("{", m.start(), m.end())
+    if open_pos < 0:
+        return None
+
+    close_pos = find_matching_brace(text, open_pos)
+    if close_pos < 0:
+        return None
+
+    return m, open_pos, close_pos
+
+
+# ============================================================
+# 1. IMPORTS
+# ============================================================
+
+required_imports = [
+    "import android.graphics.Typeface",
+    "import android.widget.TextView",
+    "import java.text.SimpleDateFormat",
+    "import java.util.Date",
+    "import java.util.Locale",
+]
+
+anchor = "import android.accessibilityservice.AccessibilityService"
+
+if anchor not in code:
+    raise RuntimeError("AccessibilityService import not found")
+
+for imp in required_imports:
+    if imp not in code:
+        code = code.replace(anchor, anchor + "\n" + imp, 1)
+
+
+# ============================================================
+# 2. WIN X STABLE PATCH
+# ============================================================
+
+if "WINX_STABLE_PATCH" not in code:
+    match = re.search(
+        r"(class\s+NavigationOverlayService[^{]*\{)",
+        code
+    )
+
+    if not match:
+        raise RuntimeError("NavigationOverlayService class not found")
+
+    winx_patch = r'''
+
+    // WINX_STABLE_PATCH
+
+    private var isWinXLauncher = false
+    private var winXCheckRunnable: Runnable? = null
+
+    private fun getCurrentForegroundPackage(): String {
+        return try {
+            rootInActiveWindow?.packageName?.toString() ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun checkWinXStateDelayed() {
+        winXCheckRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+
+        winXCheckRunnable = Runnable {
+            val currentPackage = getCurrentForegroundPackage()
+
+            if (currentPackage == "com.InternityLabs.Launcher.WinX") {
+                if (!isWinXLauncher) {
+                    isWinXLauncher = true
+
+                    navBarCheckRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    insetsDebounce?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    autoHideRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    hideOverlay()
+                }
+            } else {
+                if (isWinXLauncher) {
+                    isWinXLauncher = false
+                    forceShowAfterWinX()
+                }
+            }
+        }
+
+        handler.postDelayed(winXCheckRunnable!!, 250)
+    }
+
+    private fun forceShowAfterWinX() {
+        val view = overlayView ?: return
+
+        view.animate().cancel()
+
+        autoHideRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+
+        autoHideRunnable = null
+
+        view.visibility = View.VISIBLE
+        view.alpha = 1f
+        view.translationX = 0f
+        view.translationY = 0f
+
+        isHidden = false
+        isFullscreenHidden = false
+
+        disableRevealZoneTouch()
+    }
+
+    // WINX_STABLE_PATCH_END
+'''
+
+    code = code[:match.end()] + winx_patch + code[match.end():]
+
+
+# ============================================================
+# 3. ACCESSIBILITY EVENT
+# ============================================================
+
+if "WINX_STABLE_EVENT_PATCH" not in code:
+    match = re.search(
+        r"(override\s+fun\s+onAccessibilityEvent\s*"
+        r"\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)",
+        code,
+    )
+
+    if not match:
+        raise RuntimeError(
+            "onAccessibilityEvent(AccessibilityEvent?) not found"
+        )
+
+    event_patch = r'''
+        // WINX_STABLE_EVENT_PATCH
+        checkWinXStateDelayed()
+        // WINX_STABLE_EVENT_PATCH_END
+
+'''
+
+    code = code[:match.end()] + event_patch + code[match.end():]
+
+
+# ============================================================
+# 4. PROTECT ONLY showOverlay()
+#    Do NOT touch showOverlayAnimated() or showRevealZone().
+# ============================================================
+
+if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
+    match = re.search(
+        r"(private\s+fun\s+showOverlay\s*\([^)]*\)\s*\{)",
+        code,
+    )
+
+    if not match:
+        raise RuntimeError("showOverlay() not found")
+
+    protection = r'''
+        // WINX_SHOW_OVERLAY_PROTECTION
+        if (isWinXLauncher) return
+
+'''
+
+    code = code[:match.end()] + protection + code[match.end():]
+
+
+# ============================================================
+# 5. CLOCK + DATE
+# ============================================================
+
+if "WINX_CLOCK_DATE_PATCH" not in code:
+    match = re.search(
+        r"(class\s+NavigationOverlayService[^{]*\{)",
+        code,
+    )
+
+    if not match:
+        raise RuntimeError("NavigationOverlayService class not found")
+
+    clock_patch = r'''
+
+    // WINX_CLOCK_DATE_PATCH
+
+    private var winXClockTextView: TextView? = null
+    private var winXDateTextView: TextView? = null
+    private var winXClockStarted = false
+
+    private val winXClockRunnable = object : Runnable {
+        override fun run() {
+            try {
+                val now = Date()
+
+                val timeText = SimpleDateFormat(
+                    "hh:mm a",
+                    Locale.ENGLISH
+                ).format(now)
+                    .replace("AM", "ص")
+                    .replace("PM", "م")
+
+                val dateText = SimpleDateFormat(
+                    "yyyy/MM/dd",
+                    Locale.ENGLISH
+                ).format(now)
+
+                winXClockTextView?.text = timeText
+                winXDateTextView?.text = dateText
+            } catch (_: Exception) {
+            }
+
+            handler.postDelayed(this, 1000)
+        }
+    }
+
+    private fun createWinXClock(
+        textColor: Int,
+        rotation: Float
+    ): LinearLayout {
+
+        val clockLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 0)
+            this.rotation = rotation
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val clock = TextView(this).apply {
+            gravity = Gravity.CENTER
+            isSingleLine = true
+            includeFontPadding = false
+            textSize = 9f
+            typeface = Typeface.DEFAULT
+            setTextColor(textColor)
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val date = TextView(this).apply {
+            gravity = Gravity.CENTER
+            isSingleLine = true
+            includeFontPadding = false
+            textSize = 9f
+            typeface = Typeface.DEFAULT
+            setTextColor(textColor)
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        clockLayout.addView(
+            clock,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        val dateParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dpToPx(1)
+        }
+
+        clockLayout.addView(date, dateParams)
+
+        winXClockTextView = clock
+        winXDateTextView = date
+
+        if (!winXClockStarted) {
+            winXClockStarted = true
+            handler.removeCallbacks(winXClockRunnable)
+            handler.post(winXClockRunnable)
+        }
+
+        return clockLayout
+    }
+
+    // WINX_CLOCK_DATE_PATCH_END
+''' 
+
+    code = code[:match.end()] + clock_patch + code[match.end():]
+
+
+# ============================================================
+# 6. INSERT CLOCK WITHOUT REPLACING THE ORIGINAL BUTTON LAYOUT
+#    This keeps all original SwipeInterceptLayout code untouched.
+# ============================================================
+
+if "WINX_CLOCK_LAYOUT_PATCH" not in code:
+    fn = find_function(code, "configureOverlayView")
+
+    if not fn:
+        raise RuntimeError("configureOverlayView() not found")
+
+    _, fn_open, fn_close = fn
+    body = code[fn_open + 1:fn_close]
+
+    add_match = re.search(
+        r"container\.addView\s*\(\s*frame\s*\)",
+        body
+    )
+
+    if not add_match:
+        raise RuntimeError(
+            "Original navigation button addView(frame) not found"
+        )
+
+    abs_add_end = fn_open + 1 + add_match.end()
+    tail = code[abs_add_end:fn_close]
+
+    loop_close_rel = tail.find("}")
+
+    if loop_close_rel < 0:
+        raise RuntimeError(
+            "Navigation button loop end not found"
+        )
+
+    insert_pos = abs_add_end + loop_close_rel + 1
+
+    clock_layout_patch = r'''
+
+        // WINX_CLOCK_LAYOUT_PATCH
+
+        val winXClockRotation = when (position) {
+            "left" -> 90f
+            "right" -> -90f
+            else -> 0f
+        }
+
+        val winXClockView = createWinXClock(
+            buttonColor,
+            winXClockRotation
+        ).apply {
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val winXSpacer = View(this).apply {
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val winXClockParams = if (isVerticalBar) {
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                hitboxSize,
+                0f
+            )
+        } else {
+            LinearLayout.LayoutParams(
+                dpToPx(50),
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0f
+            )
+        }
+
+        val winXSpacerParams = if (isVerticalBar) {
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        } else {
+            LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1f
+            )
+        }
+
+        if (shouldSwap) {
+            // Recent | Clock | SPACE | Home | Back
+            container.addView(winXClockView, 1, winXClockParams)
+            container.addView(winXSpacer, 2, winXSpacerParams)
+        } else {
+            // Back | Home | SPACE | Clock | Recent
+            container.addView(winXSpacer, 2, winXSpacerParams)
+            container.addView(winXClockView, 3, winXClockParams)
+        }
+
+        // WINX_CLOCK_LAYOUT_PATCH_END
+'''
+
+    code = code[:insert_pos] + clock_layout_patch + code[insert_pos:]
+
+
+# ============================================================
+# 7. CONTAINER GRAVITY
+# ============================================================
+
+if "WINX_CLOCK_GRAVITY_PATCH" not in code:
+    old = "container.gravity = Gravity.CENTER"
+
+    new = r'''container.gravity =
+        if (isVerticalBar)
+            Gravity.CENTER_HORIZONTAL
+        else
+            Gravity.CENTER_VERTICAL
+
+        // WINX_CLOCK_GRAVITY_PATCH'''
+
+    if old in code:
+        code = code.replace(old, new, 1)
+    else:
+        print(
+            "Warning: container.gravity line not found; "
+            "leaving original gravity"
+        )
+
+
+# ============================================================
+# 8. CLOCK CLEANUP
+# ============================================================
+
+if "WINX_CLOCK_CLEANUP_PATCH" not in code:
+    match = re.search(
+        r"(override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)",
+        code,
+    )
+
+    if match:
+        cleanup = r'''
+        // WINX_CLOCK_CLEANUP_PATCH
+        handler.removeCallbacks(winXClockRunnable)
+        winXClockStarted = false
+        winXClockTextView = null
+        winXDateTextView = null
+
+'''
+
+        code = code[:match.end()] + cleanup + code[match.end():]
+
+
+# ============================================================
+# 9. FIX OCCASIONAL DISAPPEARANCE ONLY
+# ============================================================
+
+if "WINX_AUTO_HIDE_GUARD_PATCH" not in code:
+    fn = find_function(code, "scheduleAutoHide")
+
+    if fn:
+        _, fn_open, fn_close = fn
+
+        guard = r'''
+        // WINX_AUTO_HIDE_GUARD_PATCH
+        if (!isWinXLauncher) return
+
+'''
+
+        code = (
+            code[:fn_open + 1]
+            + guard
+            + code[fn_open + 1:]
+        )
+    else:
+        print(
+            "Warning: scheduleAutoHide() not found; "
+            "no auto-hide guard added"
+        )
+
+
+# ============================================================
+# 10. SAVE
+# ============================================================
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(code)
+
+print("================================================")
+print(" OPENNAVBAR WIN X + CLOCK PATCH")
+print("================================================")
+print("")
+print("Win X package:")
+print(WINX_PACKAGE)
+print("")
+print("Win X: hide only on Win X launcher")
+print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
+print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
+print("Fix: original auto-hide disabled outside Win X")
+print("================================================")
+print("PATCH COMPLETE")
+print("================================================")
