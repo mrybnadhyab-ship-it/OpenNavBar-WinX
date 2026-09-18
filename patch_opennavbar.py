@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from pathlib import Path
 import re
 import sys
@@ -12,16 +11,16 @@ else:
     SOURCE = Path("opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt")
 
 
-def fail(message):
-    print("ERROR:", message)
+def fail(msg):
+    print("ERROR:", msg)
     sys.exit(1)
 
 
 def find_matching_brace(text, opening_pos):
     depth = 0
     in_string = False
-    escape = False
     in_char = False
+    escape = False
     for i in range(opening_pos, len(text)):
         c = text[i]
         if in_string:
@@ -53,36 +52,39 @@ def find_matching_brace(text, opening_pos):
 
 
 def find_function(text, signature):
-    pos = text.find(signature)
-    if pos == -1:
+    start = text.find(signature)
+    if start < 0:
         return None
-    brace = text.find("{", pos)
-    if brace == -1:
+    brace = text.find("{", start)
+    if brace < 0:
         return None
     end = find_matching_brace(text, brace)
-    if end == -1:
+    if end < 0:
         return None
-    return pos, brace, end
+    return start, brace, end
 
 
-def add_import(text, import_line):
-    if import_line in text:
+def add_import(text, line):
+    if line in text:
         return text
     positions = [m.start() for m in re.finditer(r"^import ", text, re.MULTILINE)]
     if not positions:
         return text
     last = positions[-1]
-    line_end = text.find("\n", last)
-    if line_end == -1:
-        line_end = len(text)
-    return text[:line_end + 1] + import_line + "\n" + text[line_end + 1:]
+    eol = text.find("\n", last)
+    if eol < 0:
+        eol = len(text)
+    return text[:eol + 1] + line + "\n" + text[eol + 1:]
 
 
 if not SOURCE.exists():
-    fail(f"Source file not found: {SOURCE}")
+    fail("Source file not found: " + str(SOURCE))
 
 code = SOURCE.read_text(encoding="utf-8")
 
+# ------------------------------------------------------------
+# Imports
+# ------------------------------------------------------------
 for imp in [
     "import android.graphics.Typeface",
     "import android.widget.TextView",
@@ -93,19 +95,27 @@ for imp in [
 ]:
     code = add_import(code, imp)
 
+# ------------------------------------------------------------
+# Top-level WinX constant
+# ------------------------------------------------------------
+if "WINX_PACKAGE_PATCH_CONSTANT" not in code:
+    marker = "class NavigationOverlayService"
+    pos = code.find(marker)
+    if pos < 0:
+        fail("NavigationOverlayService class not found")
+    const = 'private const val WINX_PACKAGE_PATCH_CONSTANT = "com.InternityLabs.Launcher.WinX"\n\n'
+    code = code[:pos] + const + code[pos:]
 
 # ------------------------------------------------------------
-# WinX state
+# State variables
 # ------------------------------------------------------------
 if "WINX_PATCH_STATE" not in code:
-    pos = code.find("class NavigationOverlayService")
-    if pos == -1:
-        fail("NavigationOverlayService class not found")
+    marker = "class NavigationOverlayService"
+    pos = code.find(marker)
     brace = code.find("{", pos)
-    if brace == -1:
+    if brace < 0:
         fail("Class opening brace not found")
-
-    block = '''
+    block = """
     // ========================================================
     // WINX_PATCH_STATE
     // ========================================================
@@ -123,20 +133,18 @@ if "WINX_PATCH_STATE" not in code:
     private var winXClockRunnable: Runnable? = null
     private var winXClockHandler: Handler? = null
 
-'''
+"""
     code = code[:brace + 1] + block + code[brace + 1:]
 
-
 # ------------------------------------------------------------
-# WinX helpers
+# Helper functions
 # ------------------------------------------------------------
 if "WINX_PATCH_HELPERS" not in code:
     marker = "    // ========================================================\n    // WINX_PATCH_STATE"
     pos = code.find(marker)
-    if pos == -1:
+    if pos < 0:
         fail("WINX state marker not found")
-
-    helpers = '''
+    helpers = """
     // ========================================================
     // WINX_PATCH_HELPERS
     // ========================================================
@@ -150,12 +158,9 @@ if "WINX_PATCH_HELPERS" not in code:
                     false
                 }
             }
-
             if (active != null) {
                 val pkg = active.root?.packageName?.toString()
-                if (!pkg.isNullOrEmpty()) {
-                    return pkg
-                }
+                if (!pkg.isNullOrEmpty()) return pkg
             }
         } catch (_: Exception) {
         }
@@ -164,26 +169,19 @@ if "WINX_PATCH_HELPERS" not in code:
             return rootInActiveWindow?.packageName?.toString()
         } catch (_: Exception) {
         }
-
         return null
     }
 
     private fun updateWinXState(packageName: String?) {
         val wasWinX = isWinXLauncher
-        isWinXLauncher = packageName == WINX_PACKAGE
+        isWinXLauncher = packageName == WINX_PACKAGE_PATCH_CONSTANT
 
         if (isWinXLauncher && !wasWinX) {
-            try {
-                hideOverlay()
-            } catch (_: Exception) {
-            }
+            try { hideOverlay() } catch (_: Exception) { }
         }
 
         if (!isWinXLauncher && wasWinX) {
-            try {
-                showOverlayAnimated()
-            } catch (_: Exception) {
-            }
+            try { showOverlayAnimated() } catch (_: Exception) { }
         }
     }
 
@@ -198,132 +196,87 @@ if "WINX_PATCH_HELPERS" not in code:
     private fun clickWinXStartButton(): Boolean {
         try {
             val root = rootInActiveWindow ?: return false
-
-            val nodesByText = try {
+            val byText = try {
                 root.findAccessibilityNodeInfosByText("Start")
             } catch (_: Exception) {
                 emptyList()
             }
 
-            for (node in nodesByText) {
+            for (node in byText) {
                 try {
-                    if (node.isClickable &&
-                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    ) {
-                        return true
+                    if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+                    node.parent?.let { p ->
+                        if (p.isClickable && p.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
                     }
-
-                    node.parent?.let { parent ->
-                        if (parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                            return true
-                        }
-                    }
-                } catch (_: Exception) {
-                }
+                } catch (_: Exception) { }
             }
 
             val queue = ArrayDeque<AccessibilityNodeInfo>()
             queue.add(root)
-
             while (queue.isNotEmpty()) {
                 val node = queue.removeFirst()
-
                 try {
                     val text = node.text?.toString()?.lowercase(Locale.getDefault()) ?: ""
-                    val description = node.contentDescription?.toString()?.lowercase(Locale.getDefault()) ?: ""
-                    val viewId = node.viewIdResourceName?.lowercase(Locale.getDefault()) ?: ""
+                    val desc = node.contentDescription?.toString()?.lowercase(Locale.getDefault()) ?: ""
+                    val id = node.viewIdResourceName?.lowercase(Locale.getDefault()) ?: ""
+                    val isStart = text == "start" || desc == "start" || id.contains("start")
 
-                    val looksLikeStart =
-                        text == "start" ||
-                        description == "start" ||
-                        viewId.contains("start")
-
-                    if (looksLikeStart) {
-                        if (node.isClickable &&
-                            node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        ) {
-                            return true
-                        }
-
+                    if (isStart) {
+                        if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
                         var parent = node.parent
                         while (parent != null) {
-                            if (parent.isClickable &&
-                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                            ) {
-                                return true
-                            }
+                            if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
                             parent = parent.parent
                         }
                     }
 
                     for (i in 0 until node.childCount) {
-                        try {
-                            node.getChild(i)?.let { queue.add(it) }
-                        } catch (_: Exception) {
-                        }
+                        try { node.getChild(i)?.let { queue.add(it) } } catch (_: Exception) { }
                     }
-                } catch (_: Exception) {
-                }
+                } catch (_: Exception) { }
             }
-        } catch (_: Exception) {
-        }
-
+        } catch (_: Exception) { }
         return false
     }
 
     private fun openWinXStart() {
         try {
             if (!isWinXLauncher) {
-                val intent = packageManager.getLaunchIntentForPackage(WINX_PACKAGE)
-
+                val intent = packageManager.getLaunchIntentForPackage(WINX_PACKAGE_PATCH_CONSTANT)
                 if (intent != null) {
-                    intent.addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                    )
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                     startActivity(intent)
                 }
-
                 handler.postDelayed({
                     try {
-                        updateWinXState(WINX_PACKAGE)
+                        updateWinXState(WINX_PACKAGE_PATCH_CONSTANT)
                         clickWinXStartButton()
-                    } catch (_: Exception) {
-                    }
+                    } catch (_: Exception) { }
                 }, 650)
-            } else {
-                if (!clickWinXStartButton()) {
-                    handler.postDelayed({
-                        try {
-                            clickWinXStartButton()
-                        } catch (_: Exception) {
-                        }
-                    }, 250)
-                }
+            } else if (!clickWinXStartButton()) {
+                handler.postDelayed({
+                    try { clickWinXStartButton() } catch (_: Exception) { }
+                }, 250)
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) { }
     }
 
-'''
+"""
     code = code[:pos] + helpers + code[pos:]
 
-
 # ------------------------------------------------------------
-# onAccessibilityEvent
+# Preserve original onAccessibilityEvent; only inject detection
 # ------------------------------------------------------------
 result = find_function(code, "override fun onAccessibilityEvent(event: AccessibilityEvent?)")
 if not result:
     fail("onAccessibilityEvent not found")
 start, brace, end = result
 old = code[start:end + 1]
-
 if "WINX_EVENT_PATCH" not in old:
-    new = '''override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    inject = """
         // ====================================================
         // WINX_EVENT_PATCH
         // ====================================================
-
         try {
             val eventPackage = event?.packageName?.toString()
             if (!eventPackage.isNullOrEmpty()) {
@@ -334,122 +287,64 @@ if "WINX_EVENT_PATCH" not in old:
         } catch (_: Exception) {
         }
 
-        try {
-            handleKeyboardStateChange(event)
-        } catch (_: Exception) {
-        }
-
-        try {
-            val fullscreen =
-                event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-
-            if (isWinXLauncher &&
-                fullscreen &&
-                prefs.getBoolean("hide_on_fullscreen", true)
-            ) {
-                if (!isSystemNavBarPresent()) {
-                    scheduleTemporaryHide(250)
-                }
-            }
-        } catch (_: Exception) {
-        }
-    }'''
+"""
+    new = old.replace("{", "{\n" + inject, 1)
     code = code[:start] + new + code[end + 1:]
 
-
 # ------------------------------------------------------------
-# WinX-only hiding
+# Any temporary hide is allowed only in WinX
 # ------------------------------------------------------------
-for signature, marker in [
-    ("private fun scheduleTemporaryHide", "WINX_TEMP_HIDE_PROTECTION"),
-    ("private fun scheduleAutoHide", "WINX_AUTO_HIDE_PROTECTION"),
-]:
-    result = find_function(code, signature)
-    if result:
-        start, brace, end = result
-        old = code[start:end + 1]
-        if marker not in old:
-            new = old.replace(
-                "{",
-                "{\n        // " + marker + "\n        if (!isWinXLauncher) return",
-                1,
-            )
-            code = code[:start] + new + code[end + 1:]
-
-
-# ------------------------------------------------------------
-# Keyboard hiding only in WinX
-# ------------------------------------------------------------
-result = find_function(code, "private fun handleKeyboardStateChange")
+result = find_function(code, "private fun scheduleTemporaryHide")
 if result:
     start, brace, end = result
     old = code[start:end + 1]
-    if "WINX_KEYBOARD_PROTECTION" not in old:
-        new = old.replace(
-            "if (isKeyboardVisible) {",
-            "if (isKeyboardVisible && isWinXLauncher) {\n            // WINX_KEYBOARD_PROTECTION",
-            1,
-        )
+    if "WINX_TEMP_HIDE_PROTECTION" not in old:
+        new = old.replace("{", "{\n        // WINX_TEMP_HIDE_PROTECTION\n        if (!isWinXLauncher) return", 1)
         code = code[:start] + new + code[end + 1:]
 
+# ------------------------------------------------------------
+# Auto hide only in WinX
+# ------------------------------------------------------------
+result = find_function(code, "private fun scheduleAutoHide")
+if result:
+    start, brace, end = result
+    old = code[start:end + 1]
+    if "WINX_AUTO_HIDE_PROTECTION" not in old:
+        new = old.replace("{", "{\n        // WINX_AUTO_HIDE_PROTECTION\n        if (!isWinXLauncher) return", 1)
+        code = code[:start] + new + code[end + 1:]
 
 # ------------------------------------------------------------
-# Prevent automatic re-show while WinX is active
-# ------------------------------------------------------------
-for signature, marker in [
-    ("private fun showOverlay", "WINX_SHOW_PROTECTION"),
-    ("private fun showOverlayAnimated", "WINX_SHOW_ANIMATED_PROTECTION"),
-    ("private fun updateOverlayLive", "WINX_UPDATE_LIVE_PROTECTION"),
-]:
-    result = find_function(code, signature)
-    if result:
-        start, brace, end = result
-        old = code[start:end + 1]
-        if marker not in old:
-            new = old.replace(
-                "{",
-                "{\n        // " + marker + "\n        if (isWinXLauncher) return",
-                1,
-            )
-            code = code[:start] + new + code[end + 1:]
-
-
-# ------------------------------------------------------------
-# Long press Home -> WinX Start
+# Long press Home opens WinX Start only while WinX is active
 # ------------------------------------------------------------
 result = find_function(code, "private fun handleLongPress")
 if not result:
     fail("handleLongPress not found")
 start, brace, end = result
 old = code[start:end + 1]
-
 if "WINX_LONG_PRESS_START" not in old:
-    new = '''private fun handleLongPress(buttonType: String) {
+    new = """private fun handleLongPress(buttonType: String) {
         // ====================================================
         // WINX_LONG_PRESS_START
         // ====================================================
-
         if (isButtonDisabled(buttonType)) return
         if (isButtonHidden(buttonType)) return
         if (!prefs.getBoolean("enable_long_press", true)) return
 
-        if (buttonType == "home") {
+        if (buttonType == "home" && isWinXLauncher) {
             openWinXStart()
             return
         }
 
         executeAction("long_press_$buttonType", 70)
-    }'''
+    }"""
     code = code[:start] + new + code[end + 1:]
 
-
 # ------------------------------------------------------------
-# Clock/date
+# Clock/date: one line to avoid malformed Kotlin string literals
 # ------------------------------------------------------------
 result = find_function(code, "private fun configureOverlayView")
 if not result:
     fail("configureOverlayView not found")
-
 fn_start, fn_brace, fn_end = result
 configure_code = code[fn_start:fn_end + 1]
 
@@ -462,22 +357,17 @@ if "WINX_CLOCK_INSERTED" not in configure_code:
     abs_add_end = fn_open + 1 + add_match.end()
     tail = configure_code[abs_add_end:]
     loop_close_rel = tail.find("}")
-    if loop_close_rel == -1:
+    if loop_close_rel < 0:
         fail("Could not find button loop closing brace")
-
     insert_pos = abs_add_end + loop_close_rel + 1
 
-    clock_block = '''
+    clock_block = """
         // ====================================================
         // WINX_CLOCK_INSERTED
         // ====================================================
-
         try {
             winXClockView?.let {
-                try {
-                    container.removeView(it)
-                } catch (_: Exception) {
-                }
+                try { container.removeView(it) } catch (_: Exception) { }
             }
 
             winXClockView = TextView(this).apply {
@@ -489,7 +379,6 @@ if "WINX_CLOCK_INSERTED" not in configure_code:
                 setTextColor(Color.WHITE)
                 isClickable = false
                 isFocusable = false
-                rotation = 0f
             }
 
             winXClockHandler?.removeCallbacksAndMessages(null)
@@ -501,18 +390,12 @@ if "WINX_CLOCK_INSERTED" not in configure_code:
                         val now = Date()
                         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
                         val dateFormat = SimpleDateFormat("dd/MM", Locale.getDefault())
-
-                        winXClockView?.text =
-                            timeFormat.format(now) +
-                            "\n" +
-                            dateFormat.format(now)
-                    } catch (_: Exception) {
-                    }
+                        winXClockView?.text = timeFormat.format(now) + "  " + dateFormat.format(now)
+                    } catch (_: Exception) { }
 
                     try {
                         winXClockHandler?.postDelayed(this, 1000)
-                    } catch (_: Exception) {
-                    }
+                    } catch (_: Exception) { }
                 }
             }
 
@@ -520,37 +403,24 @@ if "WINX_CLOCK_INSERTED" not in configure_code:
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
-
             clockParams.gravity = Gravity.CENTER_VERTICAL
             clockParams.leftMargin = 4
             clockParams.rightMargin = 4
 
             val clock = winXClockView
-
             if (clock != null) {
                 if (prefs.getBoolean("swap_back_recent", false)) {
                     container.addView(clock, 1, clockParams)
                 } else {
                     container.addView(clock, 3, clockParams)
                 }
-
-                winXClockRunnable?.let {
-                    winXClockHandler?.post(it)
-                }
+                winXClockRunnable?.let { winXClockHandler?.post(it) }
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) { }
 
-'''
+"""
 
-    code = (
-        code[:fn_start]
-        + configure_code[:insert_pos]
-        + clock_block
-        + configure_code[insert_pos:]
-        + code[fn_end + 1:]
-    )
-
+    code = code[:fn_start] + configure_code[:insert_pos] + clock_block + configure_code[insert_pos:] + code[fn_end + 1:]
 
 # ------------------------------------------------------------
 # Clock cleanup
@@ -560,48 +430,46 @@ if result:
     start, brace, end = result
     old = code[start:end + 1]
     if "WINX_CLOCK_CLEANUP" not in old:
-        cleanup = '''
+        cleanup = """
         // WINX_CLOCK_CLEANUP
         try {
             winXClockHandler?.removeCallbacksAndMessages(null)
             winXClockHandler = null
             winXClockRunnable = null
             winXClockView = null
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) { }
 
-'''
+"""
         new = old.replace("{", "{\n" + cleanup, 1)
         code = code[:start] + new + code[end + 1:]
-
 
 # ------------------------------------------------------------
 # State checks
 # ------------------------------------------------------------
-for signature, marker in [
-    ("override fun onSharedPreferenceChanged", "WINX_PREF_STATE_CHECK"),
-    ("override fun onServiceConnected", "WINX_SERVICE_CONNECTED"),
-]:
-    result = find_function(code, signature)
-    if result:
-        start, brace, end = result
-        old = code[start:end + 1]
-        if marker not in old:
-            line = "checkWinXStateDelayed()"
-            new = old.replace("{", "{\n        // " + marker + "\n        " + line, 1)
-            code = code[:start] + new + code[end + 1:]
+result = find_function(code, "override fun onServiceConnected")
+if result:
+    start, brace, end = result
+    old = code[start:end + 1]
+    if "WINX_SERVICE_CONNECTED" not in old:
+        new = old.replace("{", "{\n        // WINX_SERVICE_CONNECTED\n        checkWinXStateDelayed()", 1)
+        code = code[:start] + new + code[end + 1:]
 
+result = find_function(code, "override fun onSharedPreferenceChanged")
+if result:
+    start, brace, end = result
+    old = code[start:end + 1]
+    if "WINX_PREF_STATE_CHECK" not in old:
+        new = old.replace("{", "{\n        // WINX_PREF_STATE_CHECK\n        checkWinXStateDelayed()", 1)
+        code = code[:start] + new + code[end + 1:]
 
 SOURCE.write_text(code, encoding="utf-8")
-
 print("==============================================")
 print(" OpenNavBar-WinX PATCH COMPLETE")
 print("==============================================")
 print("Source:", SOURCE)
 print("WinX detection: OK")
-print("WinX auto-hide protection: OK")
-print("MiXplorer stability protection: OK")
+print("WinX-only auto hide: OK")
+print("MiXplorer stability: OK")
 print("Long press Home -> WinX Start: OK")
-print("Clock/date patch: OK")
+print("Clock/date: OK")
 print("==============================================")
-            
