@@ -846,102 +846,11 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
 
 # ============================================================
 # ============================================================
-# 8.9. MICROSOFT ICON — EXTERNAL DRAWABLE
-#      Gmail is NOT touched.
-# ============================================================
-
-icon_path = Path(__file__).resolve().parent / "Adobe_20230903_191353.png"
-
-if not icon_path.is_file():
-    raise FileNotFoundError(
-        "Required Microsoft icon not found: " + str(icon_path)
-    )
-
-import shutil
-
-project_root = Path(__file__).resolve().parent / "opennavbar"
-
-drawable_dir = (
-    project_root
-    / "app"
-    / "src"
-    / "main"
-    / "res"
-    / "drawable-nodpi"
-)
-
-drawable_dir.mkdir(parents=True, exist_ok=True)
-
-microsoft_drawable = drawable_dir / "microsoft_adobe.png"
-
-shutil.copyfile(
-    icon_path,
-    microsoft_drawable
-)
-
-old_microsoft_source = r'''val microsoftIconBase64 = "__ADOBE_ICON_BASE64__"
-                    val microsoftIconBytes = android.util.Base64.decode(
-                        microsoftIconBase64,
-                        android.util.Base64.DEFAULT
-                    )
-                    val sourceBitmap = android.graphics.BitmapFactory.decodeByteArray(
-                        microsoftIconBytes,
-                        0,
-                        microsoftIconBytes.size
-                    )'''
-
-new_microsoft_source = r'''val sourceBitmap =
-                        android.graphics.BitmapFactory.decodeResource(
-                            resources,
-                            R.drawable.microsoft_adobe
-                        )'''
-
-if old_microsoft_source in code:
-    code = code.replace(
-        old_microsoft_source,
-        new_microsoft_source,
-        1
-    )
-else:
-    if "R.drawable.microsoft_adobe" not in code:
-        raise RuntimeError(
-            "Microsoft icon source block not found"
-        )
-
-# Remove any remaining old placeholder without failing.
-code = code.replace(
-    "__ADOBE_ICON_BASE64__",
-    ""
-)
-
-print("Microsoft: external drawable resource")
-print("Microsoft: Gmail code untouched")
+# ============================================================ # 8.9. MICROSOFT ICON — LIGHTWEIGHT EXTERNAL DRAWABLE # Gmail is NOT touched. # ============================================================ icon_path = Path(__file__).resolve().parent / "Adobe_20230903_191353.png" if not icon_path.is_file(): raise FileNotFoundError( "Required Microsoft icon not found: " + str(icon_path) ) import shutil project_root = Path(__file__).resolve().parent / "opennavbar" drawable_dir = ( project_root / "app" / "src" / "main" / "res" / "drawable-nodpi" ) drawable_dir.mkdir(parents=True, exist_ok=True) microsoft_drawable = drawable_dir / "microsoft_adobe.png" shutil.copyfile( icon_path, microsoft_drawable ) # ------------------------------------------------------------ # Replace the old Base64 source with a direct Android drawable. # No Base64 decoding. # No BitmapFactory.decodeByteArray(). # No pixel-by-pixel transparency scan. # ------------------------------------------------------------ old_microsoft_source = r'''val microsoftIconBase64 = "__ADOBE_ICON_BASE64__" val microsoftIconBytes = android.util.Base64.decode( microsoftIconBase64, android.util.Base64.DEFAULT ) val sourceBitmap = android.graphics.BitmapFactory.decodeByteArray( microsoftIconBytes, 0, microsoftIconBytes.size ) // Use the exact Adobe PNG, but remove only transparent outer margins // so its visible logo is the same visual size as Gmail. if (sourceBitmap != null) { val width = sourceBitmap.width val height = sourceBitmap.height var left = width var top = height var right = -1 var bottom = -1 for (y in 0 until height) { for (x in 0 until width) { val alpha = android.graphics.Color.alpha( sourceBitmap.getPixel(x, y) ) if (alpha > 8) { if (x < left) left = x if (y < top) top = y if (x > right) right = x if (y > bottom) bottom = y } } } val visibleBitmap = if (right >= left && bottom >= top) { android.graphics.Bitmap.createBitmap( sourceBitmap, left, top, right - left + 1, bottom - top + 1 ) } else { sourceBitmap } setImageBitmap(visibleBitmap) }''' new_microsoft_source = r'''setImageResource( R.drawable.microsoft_adobe )''' if old_microsoft_source in code: code = code.replace( old_microsoft_source, new_microsoft_source, 1 ) else: # If the old block was already converted, make sure the lightweight # drawable version is present instead of the heavy Bitmap processing. if "setImageResource(" not in code or "R.drawable.microsoft_adobe" not in code: raise RuntimeError( "Microsoft icon processing block not found" ) # Make absolutely sure no Microsoft Base64 placeholder remains. code = code.replace( "__ADOBE_ICON_BASE64__", "" ) print("Microsoft: external drawable") print("Microsoft: direct setImageResource") print("Microsoft: no Base64 decoding") print("Microsoft: no Bitmap pixel scanning") print("Microsoft: Gmail code untouched") 
 
 
 # ============================================================
-# 9. SAVE
-# ============================================================
 
-with open(path, "w", encoding="utf-8") as f:
-    f.write(code)
-
-print("================================================")
-print(" OPENNAVBAR WIN X + CLOCK PATCH")
-print("================================================")
-print("")
-print("Win X package:")
-print(WINX_PACKAGE)
-print("")
-print("Win X: hide only on Win X launcher")
-print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
-print("Gmail: custom supplied icon / 16dp")
-print("Gmail: 16dp icon / beside Home on clock side")
-print("Xiaomi Community: removed")
-print("Microsoft: EXACT Adobe_20230903_191353.png / external drawable / 15dp visible logo")
-print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
-print("================================================")
-print("PATCH COMPLETE")
-print("================================================")
 
 # ============================================================
 # 9. SAVE
