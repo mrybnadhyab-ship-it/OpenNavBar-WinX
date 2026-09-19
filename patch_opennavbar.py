@@ -845,6 +845,7 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
     code = code[:destroy_match.end()] + unregister_code + code[destroy_match.end():]
 
 # ============================================================
+# ============================================================
 # 8.9. MICROSOFT ICON — EXTERNAL DRAWABLE
 #      Gmail is NOT touched.
 # ============================================================
@@ -878,8 +879,6 @@ shutil.copyfile(
     microsoft_drawable
 )
 
-# Replace the old Microsoft Base64 decoding block
-# with a normal Android drawable resource.
 old_microsoft_source = r'''val microsoftIconBase64 = "__ADOBE_ICON_BASE64__"
                     val microsoftIconBytes = android.util.Base64.decode(
                         microsoftIconBase64,
@@ -904,30 +903,45 @@ if old_microsoft_source in code:
         1
     )
 else:
-    # The Base64 block may already have been partially changed.
-    # In that case, do not fail just because the old block is absent.
     if "R.drawable.microsoft_adobe" not in code:
         raise RuntimeError(
             "Microsoft icon source block not found"
         )
 
-# Remove any remaining placeholder so the patch can never
-# fail with "Microsoft Adobe icon placeholder not found".
+# Remove any remaining old placeholder without failing.
 code = code.replace(
-    '__ADOBE_ICON_BASE64__',
-    ''
+    "__ADOBE_ICON_BASE64__",
+    ""
 )
-
-print("Microsoft: external drawable resource")
-print("Microsoft: Gmail code untouched"))
 
 print("Microsoft: external drawable resource")
 print("Microsoft: Gmail code untouched")
 
-if "__ADOBE_ICON_BASE64__" not in code:
-    raise RuntimeError("Microsoft Adobe icon placeholder not found")
 
-code = code.replace("__ADOBE_ICON_BASE64__", adobe_icon_base64)
+# ============================================================
+# 9. SAVE
+# ============================================================
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(code)
+
+print("================================================")
+print(" OPENNAVBAR WIN X + CLOCK PATCH")
+print("================================================")
+print("")
+print("Win X package:")
+print(WINX_PACKAGE)
+print("")
+print("Win X: hide only on Win X launcher")
+print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
+print("Gmail: custom supplied icon / 16dp")
+print("Gmail: 16dp icon / beside Home on clock side")
+print("Xiaomi Community: removed")
+print("Microsoft: EXACT Adobe_20230903_191353.png / external drawable / 15dp visible logo")
+print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
+print("================================================")
+print("PATCH COMPLETE")
+print("================================================")
 
 # ============================================================
 # 9. SAVE
