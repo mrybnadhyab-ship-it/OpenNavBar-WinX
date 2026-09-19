@@ -558,150 +558,7 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
             }
         }
 
-        // WINX_MICROSOFT_BUTTON_PATCH
-        // EXACT USER-SUPPLIED ADOBE IMAGE: Adobe_20230903_191353.png
-        // The patch embeds the bytes of that exact PNG into the generated Kotlin.
-        val winXMicrosoftButton = android.widget.FrameLayout(this).apply {
-            isClickable = true
-            isFocusable = true
-            isLongClickable = false
-
-            val microsoftIcon = android.widget.ImageView(this@NavigationOverlayService).apply {
-                try {
-                    val microsoftIconBase64 = "__ADOBE_ICON_BASE64__"
-                    val microsoftIconBytes = android.util.Base64.decode(
-                        microsoftIconBase64,
-                        android.util.Base64.DEFAULT
-                    )
-                    val sourceBitmap = android.graphics.BitmapFactory.decodeByteArray(
-                        microsoftIconBytes,
-                        0,
-                        microsoftIconBytes.size
-                    )
-
-                    // Use the exact Adobe PNG, but remove only transparent outer margins
-                    // so its visible logo is the same visual size as Gmail.
-                    if (sourceBitmap != null) {
-                        val width = sourceBitmap.width
-                        val height = sourceBitmap.height
-                        var left = width
-                        var top = height
-                        var right = -1
-                        var bottom = -1
-
-                        for (y in 0 until height) {
-                            for (x in 0 until width) {
-                                val alpha = android.graphics.Color.alpha(
-                                    sourceBitmap.getPixel(x, y)
-                                )
-                                if (alpha > 8) {
-                                    if (x < left) left = x
-                                    if (y < top) top = y
-                                    if (x > right) right = x
-                                    if (y > bottom) bottom = y
-                                }
-                            }
-                        }
-
-                        val visibleBitmap = if (right >= left && bottom >= top) {
-                            android.graphics.Bitmap.createBitmap(
-                                sourceBitmap,
-                                left,
-                                top,
-                                right - left + 1,
-                                bottom - top + 1
-                            )
-                        } else {
-                            sourceBitmap
-                        }
-
-                        setImageBitmap(visibleBitmap)
-                    }
-                } catch (_: Exception) {
-                    // No substitute logo: the patch must use the exact Adobe image.
-                }
-
-                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                isClickable = false
-                isFocusable = false
-                isLongClickable = false
-            }
-
-            // Visible Microsoft logo: exactly the same 20dp x 20dp image area as Gmail.
-            // The outer 40dp slot controls spacing; the icon remains centered inside it.
-            addView(
-                microsoftIcon,
-                android.widget.FrameLayout.LayoutParams(
-                    dpToPx(15),
-                    dpToPx(15),
-                    android.view.Gravity.CENTER
-                )
-            )
-
-            setOnClickListener {
-                try {
-                    val intent = android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://apps.microsoft.com/")
-                    ).apply {
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(intent)
-                } catch (_: Exception) {
-                }
-            }
-        }
-
-        // WINX_GMAIL_POSITION_PATCH
-        // shouldSwap: Recent | Clock | Gmail | SPACE | Microsoft | Home | Back
-        // normal:    Back | Home | Microsoft | SPACE | Gmail | Clock | Recent
-        if (shouldSwap) {
-            // Recent | Gmail | SPACE | Microsoft | Clock | Home | Back
-            // winXSpacer was already inserted above; never add it a second time.
-            container.addView(
-                winXGmailButton,
-                2,
-                LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    0f
-                )
-            )
-            container.addView(
-                winXMicrosoftButton,
-                4,
-                LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    0f
-                )
-            )
-        } else {
-            // Back | Home | Microsoft | Gmail | SPACE | Clock | Recent
-            // winXSpacer was already inserted above; never add it a second time.
-            container.addView(
-                winXMicrosoftButton,
-                2,
-                LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    0f
-                )
-            )
-            container.addView(
-                winXGmailButton,
-                3,
-                LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    0f
-                )
-            )
-        }
-        // WINX_GMAIL_POSITION_PATCH_END
-
-        // WINX_CLOCK_LAYOUT_PATCH_END
-'''
+    // WINX_MICROSOFT_BUTTON_PATCH // Microsoft icon from external drawable. // No Base64 / no BitmapFactory / no pixel scanning. val winXMicrosoftButton = android.widget.FrameLayout(this).apply { isClickable = true isFocusable = true isLongClickable = false val microsoftIcon = android.widget.ImageView( this@NavigationOverlayService ).apply { setImageResource( R.drawable.microsoft_adobe ) scaleType = android.widget.ImageView.ScaleType.FIT_CENTER isClickable = false isFocusable = false isFocusableInTouchMode = false isLongClickable = false } addView( microsoftIcon, android.widget.FrameLayout.LayoutParams( dpToPx(15), dpToPx(15), android.view.Gravity.CENTER ) ) setOnClickListener { try { val intent = android.content.Intent( android.content.Intent.ACTION_VIEW, android.net.Uri.parse( "https://apps.microsoft.com/" ) ).apply { addFlags( android.content.Intent.FLAG_ACTIVITY_NEW_TASK ) } startActivity(intent) } catch (_: Exception) { } } } // Add Microsoft after Gmail. if (shouldSwap) { container.addView( winXMicrosoftButton, 4, winXClockParams ) } else { container.addView( winXMicrosoftButton, 4, winXClockParams ) } // WINX_MICROSOFT_BUTTON_PATCH_END 
 
     code = code[:insert_pos] + clock_layout_patch + code[insert_pos:]
 
@@ -846,7 +703,7 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
 
 # ============================================================
 # ============================================================
-# ============================================================ # 8.9. MICROSOFT ICON — LIGHTWEIGHT EXTERNAL DRAWABLE # Gmail is NOT touched. # ============================================================ icon_path = Path(__file__).resolve().parent / "Adobe_20230903_191353.png" if not icon_path.is_file(): raise FileNotFoundError( "Required Microsoft icon not found: " + str(icon_path) ) import shutil project_root = Path(__file__).resolve().parent / "opennavbar" drawable_dir = ( project_root / "app" / "src" / "main" / "res" / "drawable-nodpi" ) drawable_dir.mkdir(parents=True, exist_ok=True) microsoft_drawable = drawable_dir / "microsoft_adobe.png" shutil.copyfile( icon_path, microsoft_drawable ) # ------------------------------------------------------------ # Replace the old Base64 source with a direct Android drawable. # No Base64 decoding. # No BitmapFactory.decodeByteArray(). # No pixel-by-pixel transparency scan. # ------------------------------------------------------------ old_microsoft_source = r'''val microsoftIconBase64 = "__ADOBE_ICON_BASE64__" val microsoftIconBytes = android.util.Base64.decode( microsoftIconBase64, android.util.Base64.DEFAULT ) val sourceBitmap = android.graphics.BitmapFactory.decodeByteArray( microsoftIconBytes, 0, microsoftIconBytes.size ) // Use the exact Adobe PNG, but remove only transparent outer margins // so its visible logo is the same visual size as Gmail. if (sourceBitmap != null) { val width = sourceBitmap.width val height = sourceBitmap.height var left = width var top = height var right = -1 var bottom = -1 for (y in 0 until height) { for (x in 0 until width) { val alpha = android.graphics.Color.alpha( sourceBitmap.getPixel(x, y) ) if (alpha > 8) { if (x < left) left = x if (y < top) top = y if (x > right) right = x if (y > bottom) bottom = y } } } val visibleBitmap = if (right >= left && bottom >= top) { android.graphics.Bitmap.createBitmap( sourceBitmap, left, top, right - left + 1, bottom - top + 1 ) } else { sourceBitmap } setImageBitmap(visibleBitmap) }''' new_microsoft_source = r'''setImageResource( R.drawable.microsoft_adobe )''' if old_microsoft_source in code: code = code.replace( old_microsoft_source, new_microsoft_source, 1 ) else: # If the old block was already converted, make sure the lightweight # drawable version is present instead of the heavy Bitmap processing. if "setImageResource(" not in code or "R.drawable.microsoft_adobe" not in code: raise RuntimeError( "Microsoft icon processing block not found" ) # Make absolutely sure no Microsoft Base64 placeholder remains. code = code.replace( "__ADOBE_ICON_BASE64__", "" ) print("Microsoft: external drawable") print("Microsoft: direct setImageResource") print("Microsoft: no Base64 decoding") print("Microsoft: no Bitmap pixel scanning") print("Microsoft: Gmail code untouched") 
+# ============================================================ # 8.9. MICROSOFT ICON — EXTERNAL DRAWABLE # Gmail is NOT touched. # ============================================================ icon_path = Path(__file__).resolve().parent / "Adobe_20230903_191353.png" if not icon_path.is_file(): raise FileNotFoundError( "Required Microsoft icon not found: " + str(icon_path) ) import shutil project_root = Path(__file__).resolve().parent / "opennavbar" drawable_dir = ( project_root / "app" / "src" / "main" / "res" / "drawable-nodpi" ) drawable_dir.mkdir(parents=True, exist_ok=True) microsoft_drawable = drawable_dir / "microsoft_adobe.png" shutil.copyfile( icon_path, microsoft_drawable ) # Remove old Microsoft Base64 code if any remains. code = code.replace( "__ADOBE_ICON_BASE64__", "" ) print("Microsoft: external drawable copied") print("Microsoft: direct drawable loading") print("Microsoft: no Base64 decoding") print("Microsoft: no pixel scanning") print("Microsoft: Gmail untouched") 
 
 
 # ============================================================
@@ -876,3 +733,4 @@ print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
 print("PATCH COMPLETE")
 print("================================================")
+ظ
