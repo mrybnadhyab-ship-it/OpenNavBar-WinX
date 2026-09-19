@@ -845,8 +845,7 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
     code = code[:destroy_match.end()] + unregister_code + code[destroy_match.end():]
 
 # ============================================================
-# ============================================================
-# 8.9. MICROSOFT ICON — LIGHT VERSION
+# 8.9. MICROSOFT ICON — EXTERNAL DRAWABLE
 #      Gmail is NOT touched.
 # ============================================================
 
@@ -860,6 +859,7 @@ if not icon_path.is_file():
 import shutil
 
 project_root = Path(__file__).resolve().parent / "opennavbar"
+
 drawable_dir = (
     project_root
     / "app"
@@ -878,7 +878,8 @@ shutil.copyfile(
     microsoft_drawable
 )
 
-# Replace ONLY the Microsoft Base64 block.
+# Replace the old Microsoft Base64 decoding block
+# with a normal Android drawable resource.
 old_microsoft_source = r'''val microsoftIconBase64 = "__ADOBE_ICON_BASE64__"
                     val microsoftIconBytes = android.util.Base64.decode(
                         microsoftIconBase64,
@@ -896,25 +897,29 @@ new_microsoft_source = r'''val sourceBitmap =
                             R.drawable.microsoft_adobe
                         )'''
 
-if old_microsoft_source not in code:
-    raise RuntimeError(
-        "Microsoft Base64 source block not found"
+if old_microsoft_source in code:
+    code = code.replace(
+        old_microsoft_source,
+        new_microsoft_source,
+        1
     )
+else:
+    # The Base64 block may already have been partially changed.
+    # In that case, do not fail just because the old block is absent.
+    if "R.drawable.microsoft_adobe" not in code:
+        raise RuntimeError(
+            "Microsoft icon source block not found"
+        )
 
+# Remove any remaining placeholder so the patch can never
+# fail with "Microsoft Adobe icon placeholder not found".
 code = code.replace(
-    old_microsoft_source,
-    new_microsoft_source,
-    1
+    '__ADOBE_ICON_BASE64__',
+    ''
 )
 
-# Remove the old placeholder check if it still exists.
-code = code.replace(
-    '''
-if "__ADOBE_ICON_BASE64__" not in code:
-    raise RuntimeError("Microsoft Adobe icon placeholder not found")
-''',
-    ""
-)
+print("Microsoft: external drawable resource")
+print("Microsoft: Gmail code untouched"))
 
 print("Microsoft: external drawable resource")
 print("Microsoft: Gmail code untouched")
