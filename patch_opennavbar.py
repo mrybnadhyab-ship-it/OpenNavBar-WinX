@@ -632,8 +632,8 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
             addView(
                 microsoftIcon,
                 android.widget.FrameLayout.LayoutParams(
-                    dpToPx(16),
-                    dpToPx(16),
+                    dpToPx(15),
+                    dpToPx(15),
                     android.view.Gravity.CENTER
                 )
             )
