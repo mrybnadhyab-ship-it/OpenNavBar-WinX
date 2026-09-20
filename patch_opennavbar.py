@@ -558,77 +558,125 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
             }
         }
 
-   // WINX_MICROSOFT_BUTTON_PATCH
+      // WINX_MICROSOFT_BUTTON_PATCH
+        // EXACT USER-SUPPLIED IMAGE:
+        // Adobe_20230903_191353.png
+        //
+        // The Python patch copies the exact PNG into:
+        // app/src/main/res/drawable-nodpi/microsoft_adobe.png
+        //
+        // No Base64.
+        // No BitmapFactory.
+        // No pixel scanning.
+        // Gmail remains completely untouched.
 
-        val winXMicrosoftButton = android.widget.FrameLayout(this).apply {
-            isClickable = true
-            isFocusable = true
-            isLongClickable = false
+        val winXMicrosoftButton =
+            android.widget.FrameLayout(this).apply {
 
-            val microsoftIcon =
-                android.widget.ImageView(this@NavigationOverlayService).apply {
+                isClickable = true
+                isFocusable = true
+                isLongClickable = false
 
-                    // Load the exact external Adobe PNG directly.
-                    // No Base64.
-                    // No BitmapFactory.
-                    // No pixel scanning.
-                    setImageResource(
-                        R.drawable.microsoft_adobe
-                    )
-
-                    scaleType =
-                        android.widget.ImageView.ScaleType.FIT_CENTER
-
-                    isClickable = false
-                    isFocusable = false
-                    isFocusableInTouchMode = false
-                    isLongClickable = false
-                }
-
-            addView(
-                microsoftIcon,
-                android.widget.FrameLayout.LayoutParams(
-                    dpToPx(15),
-                    dpToPx(15),
-                    android.view.Gravity.CENTER
-                )
-            )
-
-            setOnClickListener {
-                try {
-                    val intent = android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse(
-                            "https://apps.microsoft.com/"
-                        )
+                val microsoftIcon =
+                    android.widget.ImageView(
+                        this@NavigationOverlayService
                     ).apply {
-                        addFlags(
-                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+
+                        setImageResource(
+                            R.drawable.microsoft_adobe
                         )
+
+                        scaleType =
+                            android.widget.ImageView.ScaleType.CENTER_INSIDE
+
+                        isClickable = false
+                        isFocusable = false
+                        isLongClickable = false
                     }
 
-                    startActivity(intent)
-                } catch (_: Exception) {
+                // EXACT visible Microsoft icon size:
+                // 16dp x 16dp — same as Gmail.
+                addView(
+                    microsoftIcon,
+                    android.widget.FrameLayout.LayoutParams(
+                        dpToPx(16),
+                        dpToPx(16),
+                        android.view.Gravity.CENTER
+                    )
+                )
+
+                setOnClickListener {
+                    try {
+                        val intent =
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(
+                                    "https://apps.microsoft.com/"
+                                )
+                            ).apply {
+                                addFlags(
+                                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                )
+                            }
+
+                        startActivity(intent)
+
+                    } catch (_: Exception) {
+                    }
                 }
             }
-        }
 
-        // Add Microsoft after Gmail.
+        // WINX_MICROSOFT_BUTTON_PATCH_END
+        // WINX_GMAIL_POSITION_PATCH
+        // shouldSwap: Recent | Clock | Gmail | SPACE | Microsoft | Home | Back
+        // normal:    Back | Home | Microsoft | SPACE | Gmail | Clock | Recent
         if (shouldSwap) {
+            // Recent | Gmail | SPACE | Microsoft | Clock | Home | Back
+            // winXSpacer was already inserted above; never add it a second time.
+            container.addView(
+                winXGmailButton,
+                2,
+                LinearLayout.LayoutParams(
+                    dpToPx(40),
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0f
+                )
+            )
             container.addView(
                 winXMicrosoftButton,
                 4,
-                winXClockParams
+                LinearLayout.LayoutParams(
+                    dpToPx(40),
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0f
+                )
             )
         } else {
+            // Back | Home | Microsoft | Gmail | SPACE | Clock | Recent
+            // winXSpacer was already inserted above; never add it a second time.
             container.addView(
                 winXMicrosoftButton,
-                4,
-                winXClockParams
+                2,
+                LinearLayout.LayoutParams(
+                    dpToPx(40),
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0f
+                )
+            )
+            container.addView(
+                winXGmailButton,
+                3,
+                LinearLayout.LayoutParams(
+                    dpToPx(40),
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0f
+                )
             )
         }
+        // WINX_GMAIL_POSITION_PATCH_END
 
-        // WINX_MICROSOFT_BUTTON_PATCH_END 
+        // WINX_CLOCK_LAYOUT_PATCH_END
+'''
 
     code = code[:insert_pos] + clock_layout_patch + code[insert_pos:]
 
@@ -706,7 +754,7 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
                             forceShowAfterWinX()
                             checkWinXStateDelayed()
                         }
-                   }, 700)
+                    }, 700L)
                 }
             }
         }
@@ -772,20 +820,27 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
     code = code[:destroy_match.end()] + unregister_code + code[destroy_match.end():]
 
 # ============================================================
-# 8.9. MICROSOFT ICON — LIGHTWEIGHT EXTERNAL DRAWABLE
+# 8.9. COPY THE EXACT ADOBE IMAGE
 #      Gmail is NOT touched.
 # ============================================================
 
-icon_path = Path(__file__).resolve().parent / "Adobe_20230903_191353.png"
+icon_path = (
+    Path(__file__).resolve().parent
+    / "Adobe_20230903_191353.png"
+)
 
 if not icon_path.is_file():
     raise FileNotFoundError(
-        "Required Microsoft icon not found: " + str(icon_path)
+        "Required exact Microsoft icon not found: "
+        + str(icon_path)
     )
 
 import shutil
 
-project_root = Path(__file__).resolve().parent / "opennavbar"
+project_root = (
+    Path(__file__).resolve().parent
+    / "opennavbar"
+)
 
 drawable_dir = (
     project_root
@@ -796,24 +851,20 @@ drawable_dir = (
     / "drawable-nodpi"
 )
 
-drawable_dir.mkdir(parents=True, exist_ok=True)
+drawable_dir.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
-microsoft_drawable = drawable_dir / "microsoft_adobe.png"
+microsoft_drawable = (
+    drawable_dir
+    / "microsoft_adobe.png"
+)
 
 shutil.copyfile(
     icon_path,
     microsoft_drawable
 )
-
-print("Microsoft: external drawable copied")
-print("Microsoft: direct setImageResource")
-print("Microsoft: no Base64 decoding")
-print("Microsoft: no Bitmap pixel scanning")
-print("Microsoft: Gmail untouched")
-
-
-# ============================================================
-
 
 # ============================================================
 # 9. SAVE
