@@ -326,6 +326,42 @@ if "WINX_STABLE_PATCH" not in code:
 
 
 # ============================================================
+# 3. ORIENTATION / CONFIGURATION RECOVERY
+# ============================================================
+
+if "WINX_ORIENTATION_RECOVERY" not in code:
+    config_patch = r'''
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        handler.postDelayed({
+            try {
+                val currentPackageAfterConfig = getCurrentForegroundPackage()
+                if (currentPackageAfterConfig != "com.InternityLabs.Launcher.WinX" &&
+                    currentPackageAfterConfig.isNotEmpty() &&
+                    !isWinXLauncher) {
+                    forceShowAfterWinX()
+                    scheduleWinXOverlayHealthCheck(300L)
+                }
+            } catch (_: Exception) {
+            }
+        }, 900L)
+    }
+
+    // WINX_ORIENTATION_RECOVERY_END
+'''
+
+    anchor = re.search(
+        r"(?=\n    override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)",
+        code,
+    )
+    if not anchor:
+        raise RuntimeError("onDestroy() not found for orientation recovery insertion")
+
+    code = code[:anchor.start()] + config_patch + code[anchor.start():]
+
+
+# ============================================================
 # 3. ACCESSIBILITY EVENT
 # ============================================================
 
@@ -354,7 +390,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
             handler.postDelayed({
                 try {
                     val currentPackageAfterTransition = getCurrentForegroundPackage()
-                    if (currentPackageAfterTransition != WINX_PACKAGE &&
+                    if (currentPackageAfterTransition != "com.InternityLabs.Launcher.WinX" &&
                         currentPackageAfterTransition.isNotEmpty() &&
                         !isWinXLauncher) {
                         forceShowAfterWinX()
