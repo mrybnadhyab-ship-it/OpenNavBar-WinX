@@ -210,12 +210,22 @@ if "WINX_STABLE_PATCH" not in code:
 
                     hideOverlay()
                 }
-            } else {
+            } else if (currentPackage.isNotEmpty()) {
+                // A real package is visible, so leaving Win-X is confirmed.
+                // Empty packageName is treated as a temporary Accessibility
+                // disconnect and MUST NOT make OpenNavBar stop or lose state.
                 if (isWinXLauncher) {
                     isWinXLauncher = false
                     forceShowAfterWinX()
                 }
             }
+
+            // Keep checking independently of AccessibilityEvent delivery.
+            // This lets OpenNavBar survive a temporary Win-X/accessibility
+            // disconnect and hide again automatically when Win-X returns.
+            handler.postDelayed({
+                checkWinXStateDelayed()
+            }, 750L)
         }
 
         handler.postDelayed(winXCheckRunnable!!, 250)
