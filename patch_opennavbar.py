@@ -175,6 +175,46 @@ if "WINX_STABLE_PATCH" not in code:
 
     private var isWinXLauncher = false
     private var winXCheckRunnable: Runnable? = null
+    private var winXRestartGraceRunnable: Runnable? = null
+    private var winXRestartGraceActive = false
+
+    private fun cancelWinXRestartGrace() {
+        winXRestartGraceRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        winXRestartGraceRunnable = null
+        winXRestartGraceActive = false
+    }
+
+    private fun startWinXRestartGrace() {
+        if (winXRestartGraceActive) return
+
+        winXRestartGraceActive = true
+
+        // Win-X can temporarily disappear while restarting. Keep OpenNavBar
+        // alive and visible for up to 15 seconds. If Win-X returns earlier,
+        // the next state check cancels this timer and hides the bar again.
+        winXRestartGraceRunnable = Runnable {
+            winXRestartGraceRunnable = null
+            winXRestartGraceActive = false
+
+            try {
+                val currentPackage = getCurrentForegroundPackage()
+                if (currentPackage != "com.InternityLabs.Launcher.WinX") {
+                    isWinXLauncher = false
+                    forceShowAfterWinX()
+                }
+            } catch (_: Exception) {
+                isWinXLauncher = false
+                try {
+                    forceShowAfterWinX()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        handler.postDelayed(winXRestartGraceRunnable!!, 15000L)
+    }
 
     private fun getCurrentForegroundPackage(): String {
         return try {
@@ -194,8 +234,10 @@ if "WINX_STABLE_PATCH" not in code:
                 val currentPackage = getCurrentForegroundPackage()
 
                 when {
-                    // Win-X is definitely running/foreground: hide the bar.
+                    // Win-X is definitely back in the foreground.
                     currentPackage == "com.InternityLabs.Launcher.WinX" -> {
+                        cancelWinXRestartGrace()
+
                         if (!isWinXLauncher) {
                             isWinXLauncher = true
 
@@ -215,26 +257,26 @@ if "WINX_STABLE_PATCH" not in code:
                         }
                     }
 
-                    // Empty/unknown package means Win-X may be restarting.
-                    // IMPORTANT: keep OpenNavBar alive and visible during the
-                    // restart instead of treating the temporary gap as a
-                    // permanent exit from Win-X.
+                    // Empty/unknown package is the important case during a
+                    // Win-X restart. Do NOT treat it as a real exit.
+                    // Show/keep the bar alive and give Win-X up to 15 seconds
+                    // to come back.
                     currentPackage.isEmpty() -> {
-                        if (isWinXLauncher) {
-                            isWinXLauncher = false
+                        isWinXLauncher = false
+                        startWinXRestartGrace()
+
+                        if (overlayView?.windowToken != null &&
+                            overlayView?.visibility != View.VISIBLE
+                        ) {
                             forceShowAfterWinX()
-                        } else if (overlayView?.windowToken != null) {
-                            // Keep the existing bar visible without changing
-                            // any normal auto-hide/reveal behavior.
-                            if (overlayView?.visibility != View.VISIBLE) {
-                                forceShowAfterWinX()
-                            }
                         }
                     }
 
                     // A definite other package means the user really left
-                    // Win-X, so OpenNavBar should remain visible.
+                    // Win-X. Cancel any restart grace and keep the bar shown.
                     else -> {
+                        cancelWinXRestartGrace()
+
                         if (isWinXLauncher) {
                             isWinXLauncher = false
                             forceShowAfterWinX()
@@ -242,12 +284,11 @@ if "WINX_STABLE_PATCH" not in code:
                     }
                 }
             } catch (_: Exception) {
-                // Never let a temporary Accessibility/Win-X restart kill
-                // the OpenNavBar service.
+                // Never let a temporary Win-X restart kill OpenNavBar.
             }
 
-            // Independent periodic check. Win-X can restart without sending
-            // a useful AccessibilityEvent, so keep watching every 750 ms.
+            // Keep checking independently of AccessibilityEvents because
+            // Win-X may restart without producing a useful event.
             handler.postDelayed({
                 checkWinXStateDelayed()
             }, 750L)
@@ -810,6 +851,7 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
             handler.removeCallbacks(it)
         }
         winXCheckRunnable = null
+        cancelWinXRestartGrace()
         // WINX_STATE_MONITOR_CLEANUP_END
         // WINX_OVERLAY_HEALTH_CLEANUP
 
