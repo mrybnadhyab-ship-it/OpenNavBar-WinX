@@ -342,6 +342,30 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
         // WINX_STABLE_EVENT_PATCH
         checkWinXStateDelayed()
         scheduleWinXOverlayHealthCheck()
+
+        // WINX_VIDEO_ROTATION_RECOVERY
+        // Video/fullscreen transitions can temporarily detach the overlay
+        // (especially after portrait playback). Once the window transition
+        // finishes, restore the bar automatically instead of requiring a
+        // manual swipe/reveal. Win-X remains the only screen where the bar
+        // is intentionally hidden.
+        if (event != null &&
+            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            handler.postDelayed({
+                try {
+                    val currentPackageAfterTransition = getCurrentForegroundPackage()
+                    if (currentPackageAfterTransition != WINX_PACKAGE &&
+                        currentPackageAfterTransition.isNotEmpty() &&
+                        !isWinXLauncher) {
+                        forceShowAfterWinX()
+                        scheduleWinXOverlayHealthCheck(250L)
+                    }
+                } catch (_: Exception) {
+                }
+            }, 700L)
+        }
+        // WINX_VIDEO_ROTATION_RECOVERY_END
+
         // WINX_STABLE_EVENT_PATCH_END
 
 '''
