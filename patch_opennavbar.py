@@ -122,6 +122,56 @@ if "WINX_STABLE_PATCH" not in code:
     winx_patch = r'''
 
     // WINX_STABLE_PATCH
+    // WINX_OVERLAY_HEALTH_PATCH
+
+    private var winXOverlayHealthRunnable: Runnable? = null
+    private var winXOverlayHealthRecoveryRunning = false
+
+    private fun scheduleWinXOverlayHealthCheck(delayMs: Long = 350L) {
+        if (isWinXLauncher) return
+
+        winXOverlayHealthRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+
+        winXOverlayHealthRunnable = Runnable {
+            if (isWinXLauncher || winXOverlayHealthRecoveryRunning) return@Runnable
+
+            val view = overlayView
+            val windowAttached = try {
+                view != null && view.windowToken != null
+            } catch (_: Exception) {
+                false
+            }
+
+            // Match Navigation Bar v3.3.0's important recovery rule:
+            // a missing window token means the overlay was detached.
+            // Do NOT use visibility here, because normal auto-hide is valid.
+            if (!windowAttached) {
+                winXOverlayHealthRecoveryRunning = true
+
+                try {
+                    hideOverlay()
+                } catch (_: Exception) {
+                }
+
+                handler.postDelayed({
+                    try {
+                        if (!isWinXLauncher) {
+                            showOverlay()
+                        }
+                    } catch (_: Exception) {
+                    }
+                    winXOverlayHealthRecoveryRunning = false
+                }, 180L)
+            }
+        }
+
+        handler.postDelayed(winXOverlayHealthRunnable!!, delayMs)
+    }
+
+    // WINX_OVERLAY_HEALTH_PATCH_END
+
 
     private var isWinXLauncher = false
     private var winXCheckRunnable: Runnable? = null
@@ -215,6 +265,7 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
     event_patch = r'''
         // WINX_STABLE_EVENT_PATCH
         checkWinXStateDelayed()
+        scheduleWinXOverlayHealthCheck()
         // WINX_STABLE_EVENT_PATCH_END
 
 '''
@@ -276,7 +327,8 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
     // WINX_CLOCK_DATE_PATCH
 
     private var winXClockTextView: TextView? = null
-    private var winXDateTextView: TextView? = null
+
+private var winXDateTextView: TextView? = null
     private var winXClockStarted = false
 
     private val winXClockRunnable = object : Runnable {
@@ -711,6 +763,14 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
     )
     if match:
         cleanup = r'''
+        // WINX_OVERLAY_HEALTH_CLEANUP
+        winXOverlayHealthRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        winXOverlayHealthRunnable = null
+        winXOverlayHealthRecoveryRunning = false
+        // WINX_OVERLAY_HEALTH_CLEANUP
+
         // WINX_CLOCK_CLEANUP_PATCH
         handler.removeCallbacks(winXClockRunnable)
         winXClockStarted = false
@@ -746,6 +806,11 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
             intent: android.content.Intent?
         ) {
             when (intent?.action) {
+                android.content.Intent.ACTION_SCREEN_OFF -> {
+                    winXOverlayHealthRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+                }
                 android.content.Intent.ACTION_SCREEN_ON,
                 android.content.Intent.ACTION_USER_PRESENT -> {
                     handler.postDelayed({
@@ -774,6 +839,7 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
         // WINX_LOCK_UNLOCK_REGISTER
         if (!winXScreenReceiverRegistered) {
             val screenFilter = android.content.IntentFilter().apply {
+                addAction(android.content.Intent.ACTION_SCREEN_OFF)
                 addAction(android.content.Intent.ACTION_SCREEN_ON)
                 addAction(android.content.Intent.ACTION_USER_PRESENT)
             }
@@ -793,6 +859,10 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
             }
         }
         // WINX_LOCK_UNLOCK_REGISTER
+
+        // WINX_OVERLAY_HEALTH_CONNECTED
+        scheduleWinXOverlayHealthCheck(500L)
+        // WINX_OVERLAY_HEALTH_CONNECTED
 
 '''
     code = code[:service_match.end()] + register_code + code[service_match.end():]
@@ -884,7 +954,7 @@ print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
 print("Gmail: custom supplied icon / 16dp")
 print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
-print("Microsoft: EXACT Adobe_20230903_191353.png / 16dp visible logo like Gmail / Windows-style 40dp button slots")
+print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
 print("PATCH COMPLETE")
