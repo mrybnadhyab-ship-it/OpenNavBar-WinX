@@ -706,7 +706,7 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
                             forceShowAfterWinX()
                             checkWinXStateDelayed()
                         }
-                    }, 700L)
+                   }, 700)
                 }
             }
         }
