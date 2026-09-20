@@ -352,7 +352,7 @@ if "WINX_ORIENTATION_RECOVERY" not in code:
 '''
 
     anchor = re.search(
-        r"(?=\n    override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)",
+        r"(?=\s*override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)",
         code,
     )
     if not anchor:
