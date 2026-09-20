@@ -266,6 +266,27 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
         // WINX_STABLE_EVENT_PATCH
         checkWinXStateDelayed()
         scheduleWinXOverlayHealthCheck()
+
+        // WINX_VIDEO_ROTATION_RETURN_PATCH
+        // Restore the overlay after leaving fullscreen video
+        // or returning from a portrait/landscape rotation.
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+
+            handler.postDelayed({
+                if (!isWinXLauncher) {
+                    val currentPackage = getCurrentForegroundPackage()
+
+                    if (currentPackage.isNotEmpty() &&
+                        currentPackage != WINX_PACKAGE
+                    ) {
+                        forceShowAfterWinX()
+                        scheduleWinXOverlayHealthCheck(350L)
+                    }
+                }
+            }, 800L)
+        }
+        // WINX_VIDEO_ROTATION_RETURN_PATCH_END
+
         // WINX_STABLE_EVENT_PATCH_END
 
 '''
@@ -751,51 +772,6 @@ if "WINX_CLOCK_GRAVITY_PATCH" not in code:
     else:
         print("Warning: container.gravity line not found; leaving original gravity")
 
-# ============================================================
-# 7.5. VIDEO PORTRAIT / ROTATION RECOVERY ONLY
-# ============================================================
-
-if "WINX_VIDEO_ROTATION_RECOVERY" not in code:
-
-    anchor = re.search(
-        r"(?=\s*override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)",
-        code,
-    )
-
-    if not anchor:
-        raise RuntimeError(
-            "onDestroy() not found for orientation recovery insertion"
-        )
-
-    orientation_recovery = r'''
-    // WINX_VIDEO_ROTATION_RECOVERY
-    override fun onConfigurationChanged(
-        newConfig: android.content.res.Configuration
-    ) {
-        super.onConfigurationChanged(newConfig)
-
-        handler.postDelayed({
-            try {
-                val currentPackageAfterTransition =
-                    getCurrentForegroundPackage()
-
-                if (
-                    currentPackageAfterTransition !=
-                        "com.InternityLabs.Launcher.WinX" &&
-                    !isWinXLauncher
-                ) {
-                    forceShowAfterWinX()
-                    scheduleWinXOverlayHealthCheck(350L)
-                }
-            } catch (_: Exception) {
-            }
-        }, 700L)
-    }
-    // WINX_VIDEO_ROTATION_RECOVERY_END
-
-'''
-
-    code = code[:anchor.start()] + orientation_recovery + code[anchor.start():]
 
 # ============================================================
 # 8. CLOCK CLEANUP
