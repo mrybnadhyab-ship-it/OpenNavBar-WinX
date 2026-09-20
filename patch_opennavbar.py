@@ -190,45 +190,70 @@ if "WINX_STABLE_PATCH" not in code:
         }
 
         winXCheckRunnable = Runnable {
-            val currentPackage = getCurrentForegroundPackage()
+            try {
+                val currentPackage = getCurrentForegroundPackage()
 
-            if (currentPackage == "com.InternityLabs.Launcher.WinX") {
-                if (!isWinXLauncher) {
-                    isWinXLauncher = true
+                when {
+                    // Win-X is definitely running/foreground: hide the bar.
+                    currentPackage == "com.InternityLabs.Launcher.WinX" -> {
+                        if (!isWinXLauncher) {
+                            isWinXLauncher = true
 
-                    navBarCheckRunnable?.let {
-                        handler.removeCallbacks(it)
+                            navBarCheckRunnable?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            insetsDebounce?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            autoHideRunnable?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            hideOverlay()
+                        }
                     }
 
-                    insetsDebounce?.let {
-                        handler.removeCallbacks(it)
+                    // Empty/unknown package means Win-X may be restarting.
+                    // IMPORTANT: keep OpenNavBar alive and visible during the
+                    // restart instead of treating the temporary gap as a
+                    // permanent exit from Win-X.
+                    currentPackage.isEmpty() -> {
+                        if (isWinXLauncher) {
+                            isWinXLauncher = false
+                            forceShowAfterWinX()
+                        } else if (overlayView?.windowToken != null) {
+                            // Keep the existing bar visible without changing
+                            // any normal auto-hide/reveal behavior.
+                            if (overlayView?.visibility != View.VISIBLE) {
+                                forceShowAfterWinX()
+                            }
+                        }
                     }
 
-                    autoHideRunnable?.let {
-                        handler.removeCallbacks(it)
+                    // A definite other package means the user really left
+                    // Win-X, so OpenNavBar should remain visible.
+                    else -> {
+                        if (isWinXLauncher) {
+                            isWinXLauncher = false
+                            forceShowAfterWinX()
+                        }
                     }
-
-                    hideOverlay()
                 }
-            } else if (currentPackage.isNotEmpty()) {
-                // A real package is visible, so leaving Win-X is confirmed.
-                // Empty packageName is treated as a temporary Accessibility
-                // disconnect and MUST NOT make OpenNavBar stop or lose state.
-                if (isWinXLauncher) {
-                    isWinXLauncher = false
-                    forceShowAfterWinX()
-                }
+            } catch (_: Exception) {
+                // Never let a temporary Accessibility/Win-X restart kill
+                // the OpenNavBar service.
             }
 
-            // Keep checking independently of AccessibilityEvent delivery.
-            // This lets OpenNavBar survive a temporary Win-X/accessibility
-            // disconnect and hide again automatically when Win-X returns.
+            // Independent periodic check. Win-X can restart without sending
+            // a useful AccessibilityEvent, so keep watching every 750 ms.
             handler.postDelayed({
                 checkWinXStateDelayed()
             }, 750L)
         }
 
-        handler.postDelayed(winXCheckRunnable!!, 250)
+        handler.postDelayed(winXCheckRunnable!!, 250L)
     }
 
     private fun forceShowAfterWinX() {
@@ -779,6 +804,13 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
         }
         winXOverlayHealthRunnable = null
         winXOverlayHealthRecoveryRunning = false
+
+        // WINX_STATE_MONITOR_CLEANUP
+        winXCheckRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        winXCheckRunnable = null
+        // WINX_STATE_MONITOR_CLEANUP_END
         // WINX_OVERLAY_HEALTH_CLEANUP
 
         // WINX_CLOCK_CLEANUP_PATCH
