@@ -94,6 +94,7 @@ def find_function(text, name):
 # ============================================================
 
 required_imports = [
+    "import android.os.BatteryManager",
     "import android.graphics.Typeface",
     "import android.widget.TextView",
     "import java.text.SimpleDateFormat",
@@ -276,6 +277,35 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
     // WINX_CLOCK_DATE_PATCH
 
     private var winXClockTextView: TextView? = null
+
+private var winXBatteryTextView: TextView? = null
+private var winXBatteryReceiverRegistered = false
+
+private val winXBatteryReceiver = object : android.content.BroadcastReceiver() {
+    override fun onReceive(
+        context: android.content.Context?,
+        intent: android.content.Intent?
+    ) {
+        updateWinXBattery()
+    }
+}
+
+private fun updateWinXBattery() {
+    try {
+        val batteryManager =
+            getSystemService(android.content.Context.BATTERY_SERVICE) as BatteryManager
+
+        val level = batteryManager.getIntProperty(
+            BatteryManager.BATTERY_PROPERTY_CAPACITY
+        )
+
+        if (level >= 0) {
+            winXBatteryTextView?.text = "$level%"
+        }
+    } catch (_: Exception) {
+    }
+}
+
     private var winXDateTextView: TextView? = null
     private var winXClockStarted = false
 
@@ -366,6 +396,52 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
         winXClockTextView = clock
         winXDateTextView = date
+
+        val battery = TextView(this).apply {
+            gravity = Gravity.CENTER
+            isSingleLine = true
+            includeFontPadding = false
+            textSize = 8f
+            typeface = Typeface.DEFAULT
+            setTextColor(textColor)
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        clockLayout.addView(
+            battery,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(1)
+            }
+        )
+
+        winXBatteryTextView = battery
+        updateWinXBattery()
+
+        if (!winXBatteryReceiverRegistered) {
+            try {
+                val filter = android.content.IntentFilter(
+                    android.content.Intent.ACTION_BATTERY_CHANGED
+                )
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    registerReceiver(
+                        winXBatteryReceiver,
+                        filter,
+                        android.content.Context.RECEIVER_NOT_EXPORTED
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    registerReceiver(winXBatteryReceiver, filter)
+                }
+                winXBatteryReceiverRegistered = true
+            } catch (_: Exception) {
+            }
+        }
 
         if (!winXClockStarted) {
             winXClockStarted = true
@@ -711,6 +787,16 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
     )
     if match:
         cleanup = r'''
+        // WINX_BATTERY_CLEANUP_PATCH
+        try {
+            if (winXBatteryReceiverRegistered) {
+                unregisterReceiver(winXBatteryReceiver)
+                winXBatteryReceiverRegistered = false
+            }
+        } catch (_: Exception) {
+        }
+        winXBatteryTextView = null
+
         // WINX_CLOCK_CLEANUP_PATCH
         handler.removeCallbacks(winXClockRunnable)
         winXClockStarted = false
@@ -884,7 +970,7 @@ print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
 print("Gmail: custom supplied icon / 16dp")
 print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
-print("Microsoft: EXACT Adobe_20230903_191353.png / 16dp visible logo like Gmail / Windows-style 40dp button slots")
+print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / independent battery / Windows-style 40dp button slots")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
 print("PATCH COMPLETE")
