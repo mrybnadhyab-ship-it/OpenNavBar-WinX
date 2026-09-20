@@ -175,46 +175,6 @@ if "WINX_STABLE_PATCH" not in code:
 
     private var isWinXLauncher = false
     private var winXCheckRunnable: Runnable? = null
-    private var winXRestartGraceRunnable: Runnable? = null
-    private var winXRestartGraceActive = false
-
-    private fun cancelWinXRestartGrace() {
-        winXRestartGraceRunnable?.let {
-            handler.removeCallbacks(it)
-        }
-        winXRestartGraceRunnable = null
-        winXRestartGraceActive = false
-    }
-
-    private fun startWinXRestartGrace() {
-        if (winXRestartGraceActive) return
-
-        winXRestartGraceActive = true
-
-        // Win-X can temporarily disappear while restarting. Keep OpenNavBar
-        // alive and visible for up to 15 seconds. If Win-X returns earlier,
-        // the next state check cancels this timer and hides the bar again.
-        winXRestartGraceRunnable = Runnable {
-            winXRestartGraceRunnable = null
-            winXRestartGraceActive = false
-
-            try {
-                val currentPackage = getCurrentForegroundPackage()
-                if (currentPackage != "com.InternityLabs.Launcher.WinX") {
-                    isWinXLauncher = false
-                    forceShowAfterWinX()
-                }
-            } catch (_: Exception) {
-                isWinXLauncher = false
-                try {
-                    forceShowAfterWinX()
-                } catch (_: Exception) {
-                }
-            }
-        }
-
-        handler.postDelayed(winXRestartGraceRunnable!!, 15000L)
-    }
 
     private fun getCurrentForegroundPackage(): String {
         return try {
@@ -230,71 +190,35 @@ if "WINX_STABLE_PATCH" not in code:
         }
 
         winXCheckRunnable = Runnable {
-            try {
-                val currentPackage = getCurrentForegroundPackage()
+            val currentPackage = getCurrentForegroundPackage()
 
-                when {
-                    // Win-X is definitely back in the foreground.
-                    currentPackage == "com.InternityLabs.Launcher.WinX" -> {
-                        cancelWinXRestartGrace()
+            if (currentPackage == "com.InternityLabs.Launcher.WinX") {
+                if (!isWinXLauncher) {
+                    isWinXLauncher = true
 
-                        if (!isWinXLauncher) {
-                            isWinXLauncher = true
-
-                            navBarCheckRunnable?.let {
-                                handler.removeCallbacks(it)
-                            }
-
-                            insetsDebounce?.let {
-                                handler.removeCallbacks(it)
-                            }
-
-                            autoHideRunnable?.let {
-                                handler.removeCallbacks(it)
-                            }
-
-                            hideOverlay()
-                        }
+                    navBarCheckRunnable?.let {
+                        handler.removeCallbacks(it)
                     }
 
-                    // Empty/unknown package is the important case during a
-                    // Win-X restart. Do NOT treat it as a real exit.
-                    // Show/keep the bar alive and give Win-X up to 15 seconds
-                    // to come back.
-                    currentPackage.isEmpty() -> {
-                        isWinXLauncher = false
-                        startWinXRestartGrace()
-
-                        if (overlayView?.windowToken != null &&
-                            overlayView?.visibility != View.VISIBLE
-                        ) {
-                            forceShowAfterWinX()
-                        }
+                    insetsDebounce?.let {
+                        handler.removeCallbacks(it)
                     }
 
-                    // A definite other package means the user really left
-                    // Win-X. Cancel any restart grace and keep the bar shown.
-                    else -> {
-                        cancelWinXRestartGrace()
-
-                        if (isWinXLauncher) {
-                            isWinXLauncher = false
-                            forceShowAfterWinX()
-                        }
+                    autoHideRunnable?.let {
+                        handler.removeCallbacks(it)
                     }
+
+                    hideOverlay()
                 }
-            } catch (_: Exception) {
-                // Never let a temporary Win-X restart kill OpenNavBar.
+            } else {
+                if (isWinXLauncher) {
+                    isWinXLauncher = false
+                    forceShowAfterWinX()
+                }
             }
-
-            // Keep checking independently of AccessibilityEvents because
-            // Win-X may restart without producing a useful event.
-            handler.postDelayed({
-                checkWinXStateDelayed()
-            }, 750L)
         }
 
-        handler.postDelayed(winXCheckRunnable!!, 250L)
+        handler.postDelayed(winXCheckRunnable!!, 250)
     }
 
     private fun forceShowAfterWinX() {
@@ -342,30 +266,6 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
         // WINX_STABLE_EVENT_PATCH
         checkWinXStateDelayed()
         scheduleWinXOverlayHealthCheck()
-
-        // WINX_VIDEO_ROTATION_RECOVERY
-        // Video/fullscreen transitions can temporarily detach the overlay
-        // (especially after portrait playback). Once the window transition
-        // finishes, restore the bar automatically instead of requiring a
-        // manual swipe/reveal. Win-X remains the only screen where the bar
-        // is intentionally hidden.
-        if (event != null &&
-            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            handler.postDelayed({
-                try {
-                    val currentPackageAfterTransition = getCurrentForegroundPackage()
-                    if (currentPackageAfterTransition != "com.InternityLabs.Launcher.WinX" &&
-                        currentPackageAfterTransition.isNotEmpty() &&
-                        !isWinXLauncher) {
-                        forceShowAfterWinX()
-                        scheduleWinXOverlayHealthCheck(250L)
-                    }
-                } catch (_: Exception) {
-                }
-            }, 700L)
-        }
-        // WINX_VIDEO_ROTATION_RECOVERY_END
-
         // WINX_STABLE_EVENT_PATCH_END
 
 '''
@@ -851,6 +751,51 @@ if "WINX_CLOCK_GRAVITY_PATCH" not in code:
     else:
         print("Warning: container.gravity line not found; leaving original gravity")
 
+# ============================================================
+# 7.5. VIDEO PORTRAIT / ROTATION RECOVERY ONLY
+# ============================================================
+
+if "WINX_VIDEO_ROTATION_RECOVERY" not in code:
+
+    anchor = re.search(
+        r"(?=\s*override\s+fun\s+onDestroy\s*\(\s*\)\s*\{)",
+        code,
+    )
+
+    if not anchor:
+        raise RuntimeError(
+            "onDestroy() not found for orientation recovery insertion"
+        )
+
+    orientation_recovery = r'''
+    // WINX_VIDEO_ROTATION_RECOVERY
+    override fun onConfigurationChanged(
+        newConfig: android.content.res.Configuration
+    ) {
+        super.onConfigurationChanged(newConfig)
+
+        handler.postDelayed({
+            try {
+                val currentPackageAfterTransition =
+                    getCurrentForegroundPackage()
+
+                if (
+                    currentPackageAfterTransition !=
+                        "com.InternityLabs.Launcher.WinX" &&
+                    !isWinXLauncher
+                ) {
+                    forceShowAfterWinX()
+                    scheduleWinXOverlayHealthCheck(350L)
+                }
+            } catch (_: Exception) {
+            }
+        }, 700L)
+    }
+    // WINX_VIDEO_ROTATION_RECOVERY_END
+
+'''
+
+    code = code[:anchor.start()] + orientation_recovery + code[anchor.start():]
 
 # ============================================================
 # 8. CLOCK CLEANUP
@@ -869,14 +814,6 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
         }
         winXOverlayHealthRunnable = null
         winXOverlayHealthRecoveryRunning = false
-
-        // WINX_STATE_MONITOR_CLEANUP
-        winXCheckRunnable?.let {
-            handler.removeCallbacks(it)
-        }
-        winXCheckRunnable = null
-        cancelWinXRestartGrace()
-        // WINX_STATE_MONITOR_CLEANUP_END
         // WINX_OVERLAY_HEALTH_CLEANUP
 
         // WINX_CLOCK_CLEANUP_PATCH
