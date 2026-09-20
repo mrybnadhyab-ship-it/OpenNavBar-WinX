@@ -594,16 +594,15 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
                         isLongClickable = false
                     }
 
-                // EXACT visible Microsoft icon size:
-                // 16dp x 16dp — same as Gmail.
-                addView(
-                    microsoftIcon,
-                    android.widget.FrameLayout.LayoutParams(
-                        dpToPx(16),
-                        dpToPx(16),
-                        android.view.Gravity.CENTER
-                    )
-                )
+             // EXACT visible Microsoft icon size:
+addView(
+    microsoftIcon,
+    android.widget.FrameLayout.LayoutParams(
+        dpToPx(20),
+        dpToPx(20),
+        android.view.Gravity.CENTER
+    )
+)
 
                 setOnClickListener {
                     try {
