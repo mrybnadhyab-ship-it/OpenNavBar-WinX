@@ -1312,7 +1312,7 @@ search_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:strokeWidth="1.7"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M10.9,10.9 L6.4,15.4" />
+        android:pathData="android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M10.9,10.9 L15.4,15.4" />
 </vector>
 """
 
