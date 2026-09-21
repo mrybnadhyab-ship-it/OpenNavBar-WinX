@@ -1289,7 +1289,7 @@ show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:strokeWidth="1.7"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M4.5,10.5 L9,6 L13.5,10.5" />
+        android:pathData="M3.5,10.8 L9,5.8 L14.5,10.8" />
 
 </vector>
 """
@@ -1324,7 +1324,7 @@ search_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="1.7"
         android:strokeLineCap="round"
-        android:pathData="M3.5,8 L0.8,8" />
+        android:pathData="M3.5,8.5 L0,8.5" />
 
 </vector>
 """
@@ -1357,9 +1357,6 @@ print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay 
 print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
 print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
-print("================================================")
-print("PATCH COMPLETE")
-print("================================================")
 print("================================================")
 print("PATCH COMPLETE")
 print("================================================")
