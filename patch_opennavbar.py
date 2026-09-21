@@ -111,6 +111,29 @@ for imp in required_imports:
 
 
 # ============================================================
+# 1.5. SEARCH ICON HANDLE — POINT TOWARD BACK ONLY
+#      Keep the search icon size, slot, position, and all other
+#      patches unchanged. Only reverse the magnifying-glass handle.
+# ============================================================
+
+if "WINX_SEARCH_HANDLE_BACK_ONLY_PATCH" not in code:
+    old_handle = 'M10.9,10.9 L15.4,15.4'
+    new_handle = 'M3.9,10.9 L0.8,14.0'
+    old_left_handle = 'M3.9,10.9 L-0.6,15.4'
+
+    if old_handle in code:
+        code = code.replace(old_handle, new_handle, 1)
+    elif old_left_handle in code:
+        code = code.replace(old_left_handle, new_handle, 1)
+
+    code = code.replace(
+        "# ============================================================\n# 2. WIN X STABLE PATCH",
+        "# WINX_SEARCH_HANDLE_BACK_ONLY_PATCH\n\n"
+        "# ============================================================\n# 2. WIN X STABLE PATCH",
+        1
+    )
+
+# ============================================================
 # 2. WIN X STABLE PATCH
 # ============================================================
 
@@ -1197,23 +1220,17 @@ shutil.copyfile(
 #      No functional popup is added; this is the taskbar visual.
 # ============================================================
 
-search_vector = """<?xml version="1.0" encoding="utf-8"?>
+show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="16dp"
-    android:height="16dp"
+    android:width="18dp"
+    android:height="18dp"
     android:viewportWidth="18"
     android:viewportHeight="18">
     <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
-        android:strokeLineCap="square"
-        android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M3.9,10.9 L-0.6,15.4" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M1.9,11.9 L9,4.8 L16.1,11.9 L14.75,13.25 L9,7.5 L3.25,13.25 Z" />
 </vector>
 """
-
-
 
 show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
 show_hidden_drawable.write_text(show_hidden_vector, encoding="utf-8")
