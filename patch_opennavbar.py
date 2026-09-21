@@ -482,6 +482,23 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
 
     clock_patch = r'''
 
+    // WINX_SHARED_SPACE_SIZE_PATCH
+    // Shared SPACE size:
+    // The horizontal SPACE keeps its original calculated size.
+    // The vertical SPACE will use the same measured dp value.
+    private var winXSpacerSizeDp = 0
+
+    private fun updateWinXSpacerSize(view: View) {
+        try {
+            val sizePx = if (view.width > 0) view.width else view.height
+            if (sizePx > 0) {
+                winXSpacerSizeDp = (sizePx / resources.displayMetrics.density).toInt()
+            }
+        } catch (_: Exception) {
+        }
+    }
+    // WINX_SHARED_SPACE_SIZE_PATCH_END
+
     // WINX_CLOCK_DATE_PATCH
 
     private var winXClockTextView: TextView? = null
@@ -659,19 +676,19 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         }
 
         val winXSpacerParams = if (isVerticalBar) {
-            // Keep the portrait spacer exactly the same fixed 623dp size
-            // requested for the landscape layout.
+            // Shared SPACE size: portrait uses the same measured dp value
+            // captured from the original horizontal SPACE.
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(623),
+                dpToPx(winXSpacerSizeDp),
                 0f
             )
         } else {
-            // Same fixed 623dp spacer size in landscape.
+            // Keep the original horizontal SPACE calculation.
             LinearLayout.LayoutParams(
-                dpToPx(623),
+                0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0f
+                1f
             )
         }
 
@@ -683,6 +700,13 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
             // Back | Home | SPACE | Clock | Recent
             container.addView(winXSpacer, 2, winXSpacerParams)
             container.addView(winXClockView, 3, winXClockParams)
+        }
+
+        // WINX_SHARED_SPACE_MEASURE
+        // Measure the original horizontal SPACE after layout so the same
+        // dp value can be reused when the bar is vertical.
+        winXSpacer.post {
+            updateWinXSpacerSize(winXSpacer)
         }
 
         // WINX_GMAIL_BUTTON_PATCH
