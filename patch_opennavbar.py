@@ -1274,9 +1274,6 @@ shutil.copyfile(
 
 # ============================================================
 # 8.95. WINDOWS 10 SHOW-HIDDEN-ICONS CHEVRON
-#      Windows 10-style visual: compact thin white upward caret.
-#      18dp drawable, with the caret itself kept small and centered.
-#      No functional popup is added; this is the taskbar visual.
 # ============================================================
 
 show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
@@ -1290,20 +1287,22 @@ show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="1.7"
-        android:strokeLineCap="square"
-        android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M10.9,10.9 L15.4,15.4" />
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M4.5,10.5 L9,6 L13.5,10.5" />
 
 </vector>
 """
 
 show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
-show_hidden_drawable.write_text(show_hidden_vector, encoding="utf-8")
+show_hidden_drawable.write_text(
+    show_hidden_vector,
+    encoding="utf-8"
+)
+
 
 # ============================================================
 # 8.96. WINDOWS 10 SEARCH ICON
-#      18dp magnifying glass, with the handle pointing down-left
-#      like the reference image. The button slot remains 40dp.
 # ============================================================
 
 search_vector = """<?xml version="1.0" encoding="utf-8"?>
@@ -1317,16 +1316,24 @@ search_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="1.7"
-        android:strokeLineCap="square"
-        android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M11.5,7.4 L16.2,7.4" />
+        android:strokeLineCap="round"
+        android:pathData="M7,2.5 A4.5,4.5 0,1 0,7,11.5 A4.5,4.5 0,1 0,7,2.5" />
+
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:pathData="M10.5,7 L16,7" />
 
 </vector>
 """
 
 search_drawable = drawable_dir / "winx_search.xml"
-search_drawable.write_text(search_vector, encoding="utf-8")
-
+search_drawable.write_text(
+    search_vector,
+    encoding="utf-8"
+)
 # ============================================================
 # 9. SAVE
 # ============================================================
