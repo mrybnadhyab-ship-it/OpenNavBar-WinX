@@ -740,9 +740,11 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
                 }
 
                 scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-                isClickable = false
-                isFocusable = false
-                isLongClickable = false
+translationY = -dpToPx(1).toFloat()
+
+isClickable = false
+isFocusable = false
+isLongClickable = false
             }
 
             addView(
@@ -824,9 +826,7 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
                         )
 
                         scaleType =
-                            android.widget.ImageView.ScaleType.CENTER_INSIDE
-
-                        isClickable = false
+                            android.widget.ImageView.ScaleType.CENTER_INSIDEt   isClickable = false
                         isFocusable = false
                         isLongClickable = false
                     }
@@ -970,7 +970,7 @@ addView(
                 winXGmailButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
+                    dpToPx(38),
                     dpToPx(40),
                     0f
                 )
@@ -1308,26 +1308,31 @@ show_hidden_drawable.write_text(
 #      like the reference image. The button slot remains 40dp.
 # ============================================================
 
-search_vector = """<?xml version="1.0" encoding="utf-8"?>
+show_hidden_vector = "show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="16dp"
     android:height="16dp"
-    android:viewportWidth="18"
-    android:viewportHeight="18">
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
+        android:strokeWidth="1.6"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M3.9,10.9 L0.8,14.0" />
+        android:pathData="M2.5,10.5 L8.0,4.0 L13.5,10.5" />
+
 </vector>
 """
 
-search_drawable = drawable_dir / "winx_search.xml"
-search_drawable.write_text(search_vector, encoding="utf-8")
+show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
+show_hidden_drawable.write_text(
+    show_hidden_vector,
+    encoding="utf-8"
+)
 
-# ============================================================
+==========================================
 # 9. SAVE
 # ============================================================
 
