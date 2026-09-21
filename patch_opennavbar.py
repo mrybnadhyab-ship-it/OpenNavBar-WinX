@@ -175,6 +175,46 @@ if "WINX_STABLE_PATCH" not in code:
 
     private var isWinXLauncher = false
     private var winXCheckRunnable: Runnable? = null
+    private var winXRestartGraceRunnable: Runnable? = null
+    private var winXRestartGraceActive = false
+
+    private fun cancelWinXRestartGrace() {
+        winXRestartGraceRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        winXRestartGraceRunnable = null
+        winXRestartGraceActive = false
+    }
+
+    private fun startWinXRestartGrace() {
+        if (winXRestartGraceActive) return
+
+        winXRestartGraceActive = true
+
+        // Win-X can temporarily disappear while restarting. Keep OpenNavBar
+        // alive and visible for up to 15 seconds. If Win-X returns earlier,
+        // the next state check cancels this timer and hides the bar again.
+        winXRestartGraceRunnable = Runnable {
+            winXRestartGraceRunnable = null
+            winXRestartGraceActive = false
+
+            try {
+                val currentPackage = getCurrentForegroundPackage()
+                if (currentPackage != "com.InternityLabs.Launcher.WinX") {
+                    isWinXLauncher = false
+                    forceShowAfterWinX()
+                }
+            } catch (_: Exception) {
+                isWinXLauncher = false
+                try {
+                    forceShowAfterWinX()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        handler.postDelayed(winXRestartGraceRunnable!!, 15000L)
+    }
 
     private fun getCurrentForegroundPackage(): String {
         return try {
@@ -190,38 +230,89 @@ if "WINX_STABLE_PATCH" not in code:
         }
 
         winXCheckRunnable = Runnable {
-            val currentPackage = getCurrentForegroundPackage()
-
-            if (currentPackage == "com.InternityLabs.Launcher.WinX") {
-                if (!isWinXLauncher) {
-                    isWinXLauncher = true
-
-                    navBarCheckRunnable?.let {
-                        handler.removeCallbacks(it)
-                    }
-
-                    insetsDebounce?.let {
-                        handler.removeCallbacks(it)
-                    }
-
-                    autoHideRunnable?.let {
-                        handler.removeCallbacks(it)
-                    }
-
-                    hideOverlay()
+            try {
+                // WINX_LOCK_SCREEN_STATE_GUARD
+                if (isWinXLockScreenActive()) {
+                    hideWinXOverlayForLockScreen()
+                    handler.postDelayed({
+                        checkWinXStateDelayed()
+                    }, 750L)
+                    return@Runnable
                 }
-            } else {
-                if (isWinXLauncher) {
-                    isWinXLauncher = false
-                    forceShowAfterWinX()
+
+                val currentPackage = getCurrentForegroundPackage()
+
+                when {
+                    // Win-X is definitely back in the foreground.
+                    currentPackage == "com.InternityLabs.Launcher.WinX" -> {
+                        cancelWinXRestartGrace()
+
+                        if (!isWinXLauncher) {
+                            isWinXLauncher = true
+
+                            navBarCheckRunnable?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            insetsDebounce?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            autoHideRunnable?.let {
+                                handler.removeCallbacks(it)
+                            }
+
+                            hideOverlay()
+                        }
+                    }
+
+                    // Empty/unknown package is the important case during a
+                    // Win-X restart. Do NOT treat it as a real exit.
+                    // Show/keep the bar alive and give Win-X up to 15 seconds
+                    // to come back.
+                    currentPackage.isEmpty() -> {
+                        isWinXLauncher = false
+                        startWinXRestartGrace()
+
+                        if (overlayView?.windowToken != null &&
+                            overlayView?.visibility != View.VISIBLE
+                        ) {
+                            forceShowAfterWinX()
+                        }
+                    }
+
+                    // A definite other package means the user really left
+                    // Win-X. Cancel any restart grace and keep the bar shown.
+                    else -> {
+                        cancelWinXRestartGrace()
+
+                        if (isWinXLauncher) {
+                            isWinXLauncher = false
+                            forceShowAfterWinX()
+                        }
+                    }
                 }
+            } catch (_: Exception) {
+                // Never let a temporary Win-X restart kill OpenNavBar.
             }
+
+            // Keep checking independently of AccessibilityEvents because
+            // Win-X may restart without producing a useful event.
+            handler.postDelayed({
+                checkWinXStateDelayed()
+            }, 750L)
         }
 
-        handler.postDelayed(winXCheckRunnable!!, 250)
+        handler.postDelayed(winXCheckRunnable!!, 250L)
     }
 
     private fun forceShowAfterWinX() {
+        // WINX_FORCE_SHOW_LOCK_GUARD
+        if (isWinXLockScreenActive()) {
+            hideWinXOverlayForLockScreen()
+            return
+        }
+
         val view = overlayView ?: return
 
         view.animate().cancel()
@@ -244,6 +335,37 @@ if "WINX_STABLE_PATCH" not in code:
     }
 
     // WINX_STABLE_PATCH_END
+
+
+    // WINX_LOCK_SCREEN_GUARD_PATCH
+    // Never allow OpenNavBar to be visible while the Android keyguard/lock
+    // screen is active. This is intentionally independent of Win-X state.
+    private fun isWinXLockScreenActive(): Boolean {
+        return try {
+            val keyguardManager =
+                getSystemService(android.content.Context.KEYGUARD_SERVICE)
+                    as? android.app.KeyguardManager
+            keyguardManager?.isKeyguardLocked == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun hideWinXOverlayForLockScreen() {
+        try {
+            winXOverlayHealthRunnable?.let {
+                handler.removeCallbacks(it)
+            }
+            autoHideRunnable?.let {
+                handler.removeCallbacks(it)
+            }
+            overlayView?.animate()?.cancel()
+            overlayView?.visibility = View.GONE
+            overlayView?.alpha = 0f
+        } catch (_: Exception) {
+        }
+    }
+    // WINX_LOCK_SCREEN_GUARD_PATCH_END
 '''
 
     code = code[:match.end()] + winx_patch + code[match.end():]
@@ -264,28 +386,37 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
 
     event_patch = r'''
         // WINX_STABLE_EVENT_PATCH
+        // WINX_LOCK_SCREEN_EVENT_GUARD
+        if (isWinXLockScreenActive()) {
+            hideWinXOverlayForLockScreen()
+            return
+        }
+
         checkWinXStateDelayed()
         scheduleWinXOverlayHealthCheck()
 
-        // WINX_VIDEO_ROTATION_RETURN_PATCH
-        // Restore the overlay after leaving fullscreen video
-        // or returning from a portrait/landscape rotation.
-        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-
+        // WINX_VIDEO_ROTATION_RECOVERY
+        // Video/fullscreen transitions can temporarily detach the overlay
+        // (especially after portrait playback). Once the window transition
+        // finishes, restore the bar automatically instead of requiring a
+        // manual swipe/reveal. Win-X remains the only screen where the bar
+        // is intentionally hidden.
+        if (event != null &&
+            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handler.postDelayed({
-                if (!isWinXLauncher) {
-                    val currentPackage = getCurrentForegroundPackage()
-
-                    if (currentPackage.isNotEmpty() &&
-                        currentPackage != WINX_PACKAGE
-                    ) {
+                try {
+                    val currentPackageAfterTransition = getCurrentForegroundPackage()
+                    if (currentPackageAfterTransition != "com.InternityLabs.Launcher.WinX" &&
+                        currentPackageAfterTransition.isNotEmpty() &&
+                        !isWinXLauncher) {
                         forceShowAfterWinX()
-                        scheduleWinXOverlayHealthCheck(350L)
+                        scheduleWinXOverlayHealthCheck(250L)
                     }
+                } catch (_: Exception) {
                 }
-            }, 800L)
+            }, 700L)
         }
-        // WINX_VIDEO_ROTATION_RETURN_PATCH_END
+        // WINX_VIDEO_ROTATION_RECOVERY_END
 
         // WINX_STABLE_EVENT_PATCH_END
 
@@ -310,6 +441,12 @@ if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
     protection = r'''
         // WINX_SHOW_OVERLAY_PROTECTION
         if (isWinXLauncher) return
+
+        // WINX_LOCK_SCREEN_SHOW_GUARD
+        if (isWinXLockScreenActive()) {
+            hideWinXOverlayForLockScreen()
+            return
+        }
 
 '''
     code = code[:match.end()] + protection + code[match.end():]
@@ -790,6 +927,14 @@ if "WINX_CLOCK_CLEANUP_PATCH" not in code:
         }
         winXOverlayHealthRunnable = null
         winXOverlayHealthRecoveryRunning = false
+
+        // WINX_STATE_MONITOR_CLEANUP
+        winXCheckRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        winXCheckRunnable = null
+        cancelWinXRestartGrace()
+        // WINX_STATE_MONITOR_CLEANUP_END
         // WINX_OVERLAY_HEALTH_CLEANUP
 
         // WINX_CLOCK_CLEANUP_PATCH
@@ -828,18 +973,27 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
         ) {
             when (intent?.action) {
                 android.content.Intent.ACTION_SCREEN_OFF -> {
-                    winXOverlayHealthRunnable?.let {
-                        handler.removeCallbacks(it)
-                    }
+                    // Lock screen / display-off: hide immediately and do not
+                    // attempt to restore until the user has actually unlocked.
+                    hideWinXOverlayForLockScreen()
                 }
-                android.content.Intent.ACTION_SCREEN_ON,
-                android.content.Intent.ACTION_USER_PRESENT -> {
+                android.content.Intent.ACTION_SCREEN_ON -> {
+                    // SCREEN_ON can occur while the keyguard is still visible.
+                    // Do not show OpenNavBar here.
                     handler.postDelayed({
-                        if (!isWinXLauncher) {
+                        if (isWinXLockScreenActive()) {
+                            hideWinXOverlayForLockScreen()
+                        }
+                    }, 150L)
+                }
+                android.content.Intent.ACTION_USER_PRESENT -> {
+                    // USER_PRESENT means the device has actually been unlocked.
+                    handler.postDelayed({
+                        if (!isWinXLockScreenActive() && !isWinXLauncher) {
                             forceShowAfterWinX()
                             checkWinXStateDelayed()
                         }
-                    }, 700L)
+                    }, 250L)
                 }
             }
         }
@@ -964,7 +1118,7 @@ with open(path, "w", encoding="utf-8") as f:
     f.write(code)
 
 print("================================================")
-print(" OPENNAVBAR WIN X + CLOCK PATCH")
+print(" OPENNAVBAR WIN X + CLOCK + LOCK SCREEN FIX")
 print("================================================")
 print("")
 print("Win X package:")
@@ -976,6 +1130,7 @@ print("Gmail: custom supplied icon / 16dp")
 print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
 print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
+print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
 print("PATCH COMPLETE")
