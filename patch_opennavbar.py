@@ -1141,12 +1141,13 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
 
 '''
     code = code[:destroy_match.end()] + unregister_code + code[destroy_match.end():]
-
-    # ============================================================
-# 8.96. WINDOWS 10 SEARCH ICON
-#      Search icon between Back and Home.
-#      Handle points toward Back and is slightly lowered.
 # ============================================================
+# 8.96. WINDOWS 10 SEARCH ICON
+# ============================================================
+
+project_root = Path(__file__).resolve().parent / "opennavbar"
+drawable_dir = project_root / "app" / "src" / "main" / "res" / "drawable-nodpi"
+drawable_dir.mkdir(parents=True, exist_ok=True)
 
 search_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1177,7 +1178,6 @@ search_drawable.write_text(
     search_vector,
     encoding="utf-8"
 )
-
 # ============================================================
 # 8.9. COPY THE EXACT ADOBE IMAGE
 #      Gmail is NOT touched.
