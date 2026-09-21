@@ -1308,31 +1308,31 @@ show_hidden_drawable.write_text(
 #      like the reference image. The button slot remains 40dp.
 # ============================================================
 
-show_hidden_vector = "show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
+search_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="16dp"
     android:height="16dp"
-    android:viewportWidth="16"
-    android:viewportHeight="16">
+    android:viewportWidth="18"
+    android:viewportHeight="18">
 
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.6"
+        android:strokeWidth="1.7"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M2.5,10.5 L8.0,4.0 L13.5,10.5" />
+        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M3.8,10.9 L0.2,14.5" />
 
 </vector>
 """
 
-show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
-show_hidden_drawable.write_text(
-    show_hidden_vector,
+search_drawable = drawable_dir / "winx_search.xml"
+search_drawable.write_text(
+    search_vector,
     encoding="utf-8"
 )
 
-==========================================
+# ============================================================
 # 9. SAVE
 # ============================================================
 
