@@ -542,10 +542,35 @@ private var winXDateTextView: TextView? = null
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 0)
             this.rotation = rotation
-            isClickable = false
-            isFocusable = false
+            isClickable = true
+            isFocusable = true
             isFocusableInTouchMode = false
             isLongClickable = false
+
+            setOnClickListener {
+                try {
+                    val dateTimeIntent = android.content.Intent(
+                        "android.settings.DATE_SETTINGS"
+                    ).apply {
+                        addFlags(
+                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                        )
+                    }
+                    startActivity(dateTimeIntent)
+                } catch (_: Exception) {
+                    try {
+                        val settingsIntent = android.content.Intent(
+                            android.provider.Settings.ACTION_SETTINGS
+                        ).apply {
+                            addFlags(
+                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            )
+                        }
+                        startActivity(settingsIntent)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
         }
 
         val clock = TextView(this).apply {
@@ -868,27 +893,12 @@ addView(
         // WINX_SHOW_HIDDEN_ICONS_PATCH
         // Windows 10-style "Show hidden icons" caret.
         // Fixed 40dp slot; visible white caret is 18dp.
-        // Tap opens the standard Android Battery settings.
         val winXShowHiddenButton =
             android.widget.FrameLayout(this).apply {
 
                 isClickable = true
                 isFocusable = true
                 isLongClickable = false
-
-                setOnClickListener {
-                    try {
-                        val batteryIntent =
-                            android.content.Intent(
-                                "android.settings.BATTERY_SETTINGS"
-                            )
-                        batteryIntent.addFlags(
-                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                        )
-                        startActivity(batteryIntent)
-                    } catch (_: Exception) {
-                    }
-                }
 
                 val showHiddenIcon =
                     android.widget.ImageView(
@@ -910,6 +920,31 @@ addView(
                         android.view.Gravity.CENTER
                     )
                 )
+
+                setOnClickListener {
+                    try {
+                        val batteryIntent = android.content.Intent(
+                            "android.settings.BATTERY_SETTINGS"
+                        ).apply {
+                            addFlags(
+                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            )
+                        }
+                        startActivity(batteryIntent)
+                    } catch (_: Exception) {
+                        try {
+                            val settingsIntent = android.content.Intent(
+                                android.provider.Settings.ACTION_SETTINGS
+                            ).apply {
+                                addFlags(
+                                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                )
+                            }
+                            startActivity(settingsIntent)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
             }
 
         // WINX_SEARCH_BUTTON_PATCH
@@ -1369,7 +1404,6 @@ print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
 print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
 print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
-print("Show hidden ^: opens Android Battery settings")
 print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
