@@ -863,9 +863,42 @@ addView(
             }
 
         // WINX_MICROSOFT_BUTTON_PATCH_END
+
+        // WINX_SHOW_HIDDEN_ICONS_PATCH
+        // Windows 10-style "Show hidden icons" caret.
+        // Fixed 40dp slot; visible white caret is 18dp.
+        val winXShowHiddenButton =
+            android.widget.FrameLayout(this).apply {
+
+                isClickable = false
+                isFocusable = false
+                isLongClickable = false
+
+                val showHiddenIcon =
+                    android.widget.ImageView(
+                        this@NavigationOverlayService
+                    ).apply {
+                        setImageResource(R.drawable.winx_show_hidden)
+                        scaleType =
+                            android.widget.ImageView.ScaleType.CENTER_INSIDE
+                        isClickable = false
+                        isFocusable = false
+                        isLongClickable = false
+                    }
+
+                addView(
+                    showHiddenIcon,
+                    android.widget.FrameLayout.LayoutParams(
+                        dpToPx(18),
+                        dpToPx(18),
+                        android.view.Gravity.CENTER
+                    )
+                )
+            }
+
         // WINX_GMAIL_POSITION_PATCH
-        // shouldSwap: Recent | Clock | Gmail | SPACE | Microsoft | Home | Back
-        // normal:    Back | Home | Microsoft | SPACE | Gmail | Clock | Recent
+        // shouldSwap: Recent | Clock | ShowHidden | Gmail | SPACE | Microsoft | Home | Back
+        // normal:    Back | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
         if (shouldSwap) {
             // Recent | Gmail | SPACE | Microsoft | Clock | Home | Back
             // winXSpacer was already inserted above; never add it a second time.
@@ -881,6 +914,15 @@ addView(
             container.addView(
                 winXMicrosoftButton,
                 4,
+                LinearLayout.LayoutParams(
+                    dpToPx(40),
+                    dpToPx(40),
+                    0f
+                )
+            )
+            container.addView(
+                winXShowHiddenButton,
+                2,
                 LinearLayout.LayoutParams(
                     dpToPx(40),
                     dpToPx(40),
@@ -908,6 +950,16 @@ addView(
                     0f
                 )
             )
+            container.addView(
+                winXShowHiddenButton,
+                5,
+                LinearLayout.LayoutParams(
+                    dpToPx(40),
+                    dpToPx(40),
+                    0f
+                )
+            )
+        // WINX_SHOW_HIDDEN_ICONS_PATCH_END
         }
         // WINX_GMAIL_POSITION_PATCH_END
 
@@ -1136,6 +1188,29 @@ shutil.copyfile(
     icon_path,
     microsoft_drawable
 )
+
+
+# ============================================================
+# 8.95. WINDOWS 10 SHOW-HIDDEN-ICONS CHEVRON
+#      Windows 10-style visual: compact thin white upward caret.
+#      18dp drawable, with the caret itself kept small and centered.
+#      No functional popup is added; this is the taskbar visual.
+# ============================================================
+
+show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp"
+    android:height="18dp"
+    android:viewportWidth="18"
+    android:viewportHeight="18">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.55,10.95 L9,5.5 L14.45,10.95 L13.15,12.25 L9,8.1 L4.85,12.25 Z" />
+</vector>
+"""
+
+show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
+show_hidden_drawable.write_text(show_hidden_vector, encoding="utf-8")
 
 # ============================================================
 # 9. SAVE
