@@ -1205,7 +1205,7 @@ show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
     android:viewportHeight="18">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M3.55,10.95 L9,5.5 L14.45,10.95 L13.15,12.25 L9,8.1 L4.85,12.25 Z" />
+        android:pathData="M1.9,11.9 L9,4.8 L16.1,11.9 L14.75,13.25 L9,7.5 L3.25,13.25 Z" />
 </vector>
 """
 
