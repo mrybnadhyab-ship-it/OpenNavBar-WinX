@@ -1302,8 +1302,8 @@ show_hidden_drawable.write_text(show_hidden_vector, encoding="utf-8")
 
 search_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="18dp"
-    android:height="18dp"
+    android:width="16dp"
+    android:height="16dp"
     android:viewportWidth="18"
     android:viewportHeight="18">
     <path
