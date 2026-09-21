@@ -659,18 +659,17 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         }
 
         val winXSpacerParams = if (isVerticalBar) {
-            // Fixed 1dp gap: keep Gmail and Clock visually adjacent in portrait.
+            // Keep the portrait spacer exactly the same fixed 623dp size
+            // requested for the landscape layout.
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(1),
+                dpToPx(623),
                 0f
             )
         } else {
-            // No flexible gap between Gmail and Clock.
-            // Keep the spacer slot, but make it zero-width so Gmail and
-            // the clock/date stay visually adjacent like the vertical bar.
+            // Same fixed 623dp spacer size in landscape.
             LinearLayout.LayoutParams(
-                0,
+                dpToPx(623),
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0f
             )
