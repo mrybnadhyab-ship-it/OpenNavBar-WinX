@@ -1274,31 +1274,33 @@ shutil.copyfile(
 
 # ============================================================
 # 8.95. WINDOWS 10 SHOW-HIDDEN-ICONS CHEVRON
-#      Windows 10-style visual: compact thin white upward caret.
-#      18dp drawable, with the caret itself kept small and centered.
-#      No functional popup is added; this is the taskbar visual.
+#      Windows 10 style: simple thin white upward caret (^)
+#      16dp visual inside the existing 40dp button slot.
 # ============================================================
 
 show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="16dp"
     android:height="16dp"
-    android:viewportWidth="18"
-    android:viewportHeight="18">
+    android:viewportWidth="16"
+    android:viewportHeight="16">
 
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
+        android:strokeWidth="1.6"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M10.9,10.9 L15.4,15.4" />
+        android:pathData="M3.0,9.5 L8.0,4.5 L13.0,9.5" />
 
 </vector>
 """
 
 show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
-show_hidden_drawable.write_text(show_hidden_vector, encoding="utf-8")
+show_hidden_drawable.write_text(
+    show_hidden_vector,
+    encoding="utf-8"
+)
 
 # ============================================================
 # 8.96. WINDOWS 10 SEARCH ICON
