@@ -826,7 +826,8 @@ isLongClickable = false
                         )
 
                         scaleType =
-                            android.widget.ImageView.ScaleType.CENTER_INSIDEt   isClickable = false
+                            android.widget.ImageView.ScaleType.CENTER_INSIDE
+                        isClickable = false
                         isFocusable = false
                         isLongClickable = false
                     }
