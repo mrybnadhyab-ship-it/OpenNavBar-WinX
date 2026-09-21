@@ -1324,7 +1324,7 @@ search_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="1.7"
         android:strokeLineCap="round"
-        android:pathData="M10.5,7 L16,7" />
+        android:pathData="M3.5,8 L0.8,8" />
 
 </vector>
 """
@@ -1357,6 +1357,9 @@ print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay 
 print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
 print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
+print("================================================")
+print("PATCH COMPLETE")
+print("================================================")
 print("================================================")
 print("PATCH COMPLETE")
 print("================================================")
