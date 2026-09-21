@@ -929,34 +929,36 @@ addView(
                     )
                 )
 
-                setOnClickListener {
-                    try {
-                        val intent =
-                            android.content.Intent(
-                                android.content.Intent.ACTION_WEB_SEARCH
-                            ).apply {
-                                addFlags(
-                                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                )
-                            }
-                        startActivity(intent)
-                    } catch (_: Exception) {
-                        try {
-                            val fallback =
-                                android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://www.google.com/")
-                                ).apply {
-                                    addFlags(
-                                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                    )
-                                }
-                            startActivity(fallback)
-                        } catch (_: Exception) {
-                        }
-                    }
-                }
+setOnClickListener {
+    try {
+        val intent =
+            android.content.Intent(
+                android.provider.Settings.ACTION_BATTERY_SETTINGS
+            ).apply {
+                addFlags(
+                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                )
             }
+
+        startActivity(intent)
+
+    } catch (_: Exception) {
+        try {
+            val fallback =
+                android.content.Intent(
+                    android.content.Intent.ACTION_POWER_USAGE_SUMMARY
+                ).apply {
+                    addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    )
+                }
+
+            startActivity(fallback)
+
+        } catch (_: Exception) {
+        }
+    }
+}
 
         // WINX_SEARCH_BUTTON_PATCH_END
 
