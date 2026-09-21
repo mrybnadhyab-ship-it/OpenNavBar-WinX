@@ -896,76 +896,12 @@ addView(
                 )
             }
 
-        // WINX_SEARCH_BUTTON_PATCH
-        // Windows 10-style Search icon.
-        // Fixed 40dp slot; magnifying-glass direction matches the reference:
-        // circular lens with the handle running diagonally down-left.
-        val winXSearchButton =
-            android.widget.FrameLayout(this).apply {
-
-                isClickable = true
-                isFocusable = true
-                isLongClickable = false
-
-                val searchIcon =
-                    android.widget.ImageView(
-                        this@NavigationOverlayService
-                    ).apply {
-                        setImageResource(R.drawable.winx_search)
-                        scaleType =
-                            android.widget.ImageView.ScaleType.CENTER_INSIDE
-                        isClickable = false
-                        isFocusable = false
-                        isLongClickable = false
-                    }
-
-                addView(
-                    searchIcon,
-                    android.widget.FrameLayout.LayoutParams(
-                        dpToPx(18),
-                        dpToPx(18),
-                        android.view.Gravity.CENTER
-                    )
-                )
-
-                setOnClickListener {
-                    try {
-                        val intent =
-                            android.content.Intent(
-                                android.content.Intent.ACTION_WEB_SEARCH
-                            ).apply {
-                                addFlags(
-                                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                )
-                            }
-                        startActivity(intent)
-                    } catch (_: Exception) {
-                        try {
-                            val fallback =
-                                android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://www.google.com/")
-                                ).apply {
-                                    addFlags(
-                                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                    )
-                                }
-                            startActivity(fallback)
-                        } catch (_: Exception) {
-                        }
-                    }
-                }
-            }
-
-        // WINX_SEARCH_BUTTON_PATCH_END
-
         // WINX_GMAIL_POSITION_PATCH
         // shouldSwap: Recent | Clock | ShowHidden | Gmail | SPACE | Microsoft | Home | Back
         // normal:    Back | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
         if (shouldSwap) {
-            // Recent | Clock | ShowHidden | Gmail | SPACE | Microsoft | Home | Search | Back
-            // Search is inserted immediately before Back, so it remains between
-            // Home and Back in the opposite/rotated direction.
+            // Recent | Gmail | SPACE | Microsoft | Clock | Home | Back
+            // winXSpacer was already inserted above; never add it a second time.
             container.addView(
                 winXGmailButton,
                 2,
@@ -993,18 +929,9 @@ addView(
                     0f
                 )
             )
-            container.addView(
-                winXSearchButton,
-                7,
-                LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
-                    0f
-                )
-            )
         } else {
-            // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
-            // Every taskbar button uses the same 40dp slot for even distribution.
+            // Back | Home | Microsoft | Gmail | SPACE | Clock | Recent
+            // winXSpacer was already inserted above; never add it a second time.
             container.addView(
                 winXMicrosoftButton,
                 2,
@@ -1026,15 +953,6 @@ addView(
             container.addView(
                 winXShowHiddenButton,
                 5,
-                LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
-                    0f
-                )
-            )
-            container.addView(
-                winXSearchButton,
-                1,
                 LinearLayout.LayoutParams(
                     dpToPx(40),
                     dpToPx(40),
@@ -1224,6 +1142,42 @@ if "WINX_LOCK_UNLOCK_RECOVERY_PATCH" not in code:
 '''
     code = code[:destroy_match.end()] + unregister_code + code[destroy_match.end():]
 
+    # ============================================================
+# 8.96. WINDOWS 10 SEARCH ICON
+#      Search icon between Back and Home.
+#      Handle points toward Back and is slightly lowered.
+# ============================================================
+
+search_vector = """<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp"
+    android:height="18dp"
+    android:viewportWidth="18"
+    android:viewportHeight="18">
+
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:pathData="M7,3 A4.5,4.5 0,1 0,7,12 A4.5,4.5 0,1 0,7,3" />
+
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:pathData="M3.5,9 L0,9" />
+
+</vector>
+"""
+
+search_drawable = drawable_dir / "winx_search.xml"
+search_drawable.write_text(
+    search_vector,
+    encoding="utf-8"
+)
+
 # ============================================================
 # 8.9. COPY THE EXACT ADOBE IMAGE
 #      Gmail is NOT touched.
@@ -1274,66 +1228,26 @@ shutil.copyfile(
 
 # ============================================================
 # 8.95. WINDOWS 10 SHOW-HIDDEN-ICONS CHEVRON
+#      Windows 10-style visual: compact thin white upward caret.
+#      18dp drawable, with the caret itself kept small and centered.
+#      No functional popup is added; this is the taskbar visual.
 # ============================================================
 
 show_hidden_vector = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="16dp"
-    android:height="16dp"
+    android:width="18dp"
+    android:height="18dp"
     android:viewportWidth="18"
     android:viewportHeight="18">
-
     <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M3.5,10.8 L9,5.8 L14.5,10.8" />
-
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M1.9,11.9 L9,4.8 L16.1,11.9 L14.75,13.25 L9,7.5 L3.25,13.25 Z" />
 </vector>
 """
 
 show_hidden_drawable = drawable_dir / "winx_show_hidden.xml"
-show_hidden_drawable.write_text(
-    show_hidden_vector,
-    encoding="utf-8"
-)
+show_hidden_drawable.write_text(show_hidden_vector, encoding="utf-8")
 
-
-# ============================================================
-# 8.96. WINDOWS 10 SEARCH ICON
-# ============================================================
-
-search_vector = """<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="16dp"
-    android:height="16dp"
-    android:viewportWidth="18"
-    android:viewportHeight="18">
-
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
-        android:strokeLineCap="round"
-        android:pathData="M7,2.5 A4.5,4.5 0,1 0,7,11.5 A4.5,4.5 0,1 0,7,2.5" />
-
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
-        android:strokeLineCap="round"
-        android:pathData="M3.5,8.5 L0,8.5" />
-
-</vector>
-"""
-
-search_drawable = drawable_dir / "winx_search.xml"
-search_drawable.write_text(
-    search_vector,
-    encoding="utf-8"
-)
 # ============================================================
 # 9. SAVE
 # ============================================================
@@ -1354,7 +1268,6 @@ print("Gmail: custom supplied icon / 16dp")
 print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
 print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
-print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
 print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
