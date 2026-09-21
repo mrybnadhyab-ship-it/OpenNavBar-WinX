@@ -659,16 +659,20 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         }
 
         val winXSpacerParams = if (isVerticalBar) {
+            // Fixed 1dp gap: keep Gmail and Clock visually adjacent in portrait.
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
+                dpToPx(1),
                 0f
             )
         } else {
+            // No flexible gap between Gmail and Clock.
+            // Keep the spacer slot, but make it zero-width so Gmail and
+            // the clock/date stay visually adjacent like the vertical bar.
             LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                1f
+                0f
             )
         }
 
@@ -846,8 +850,8 @@ addView(
                 winXGmailButton,
                 2,
                 LinearLayout.LayoutParams(
-                    if (isVerticalBar) LinearLayout.LayoutParams.MATCH_PARENT else dpToPx(40),
-                    if (isVerticalBar) dpToPx(40) else LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(40),
+                    dpToPx(40),
                     0f
                 )
             )
@@ -855,8 +859,8 @@ addView(
                 winXMicrosoftButton,
                 4,
                 LinearLayout.LayoutParams(
-                    if (isVerticalBar) LinearLayout.LayoutParams.MATCH_PARENT else dpToPx(40),
-                    if (isVerticalBar) dpToPx(40) else LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(40),
+                    dpToPx(40),
                     0f
                 )
             )
@@ -867,8 +871,8 @@ addView(
                 winXMicrosoftButton,
                 2,
                 LinearLayout.LayoutParams(
-                    if (isVerticalBar) LinearLayout.LayoutParams.MATCH_PARENT else dpToPx(40),
-                    if (isVerticalBar) dpToPx(40) else LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(40),
+                    dpToPx(40),
                     0f
                 )
             )
@@ -876,8 +880,8 @@ addView(
                 winXGmailButton,
                 3,
                 LinearLayout.LayoutParams(
-                    if (isVerticalBar) LinearLayout.LayoutParams.MATCH_PARENT else dpToPx(40),
-                    if (isVerticalBar) dpToPx(40) else LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(40),
+                    dpToPx(40),
                     0f
                 )
             )
