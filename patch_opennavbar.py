@@ -655,6 +655,324 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         }
 
         val winXSpacer = View(this).apply {
+         NX_LOCK_SCREEN_GUARD_PATCH
+    // Never allow OpenNavBar to be visible while the Android keyguard/lock
+    // screen is active. This is intentionally independent of Win-X state.
+    private fun isWinXLockScreenActive(): Boolean {
+        return try {
+            val keyguardManager =
+                getSystemService(android.content.Context.KEYGUARD_SERVICE)
+                    as? android.app.KeyguardManager
+            keyguardManager?.isKeyguardLocked == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun hideWinXOverlayForLockScreen() {
+        try {
+            winXOverlayHealthRunnable?.let {
+                handler.removeCallbacks(it)
+            }
+            autoHideRunnable?.let {
+                handler.removeCallbacks(it)
+            }
+            overlayView?.animate()?.cancel()
+            overlayView?.visibility = View.GONE
+            overlayView?.alpha = 0f
+        } catch (_: Exception) {
+        }
+    }
+    // WINX_LOCK_SCREEN_GUARD_PATCH_END
+'''
+
+    code = code[:match.end()] + winx_patch + code[match.end():]
+
+
+# ============================================================
+# 3. ACCESSIBILITY EVENT
+# ============================================================
+
+if "WINX_STABLE_EVENT_PATCH" not in code:
+    match = re.search(
+        r"(override\s+fun\s+onAccessibilityEvent\s*"
+        r"\(\s*event\s*:\s*AccessibilityEvent\?\s*\)\s*\{)",
+        code,
+    )
+    if not match:
+        raise RuntimeError("onAccessibilityEvent(AccessibilityEvent?) not found")
+
+    event_patch = r'''
+        // WINX_STABLE_EVENT_PATCH
+        // WINX_LOCK_SCREEN_EVENT_GUARD
+        if (isWinXLockScreenActive()) {
+            hideWinXOverlayForLockScreen()
+            return
+        }
+
+        checkWinXStateDelayed()
+        scheduleWinXOverlayHealthCheck()
+
+        // WINX_VIDEO_ROTATION_RECOVERY
+        // Video/fullscreen transitions can temporarily detach the overlay
+        // (especially after portrait playback). Once the window transition
+        // finishes, restore the bar automatically instead of requiring a
+        // manual swipe/reveal. Win-X remains the only screen where the bar
+        // is intentionally hidden.
+        if (event != null &&
+            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            handler.postDelayed({
+                try {
+                    val currentPackageAfterTransition = getCurrentForegroundPackage()
+                    if (currentPackageAfterTransition != "com.InternityLabs.Launcher.WinX" &&
+                        currentPackageAfterTransition.isNotEmpty() &&
+                        !isWinXLauncher) {
+                        forceShowAfterWinX()
+                        scheduleWinXOverlayHealthCheck(250L)
+                    }
+                } catch (_: Exception) {
+                }
+            }, 700L)
+        }
+        // WINX_VIDEO_ROTATION_RECOVERY_END
+
+        // WINX_STABLE_EVENT_PATCH_END
+
+'''
+
+    code = code[:match.end()] + event_patch + code[match.end():]
+
+
+# ============================================================
+# 4. PROTECT ONLY showOverlay()
+#    Do NOT touch showOverlayAnimated() or showRevealZone().
+# ============================================================
+
+if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
+    match = re.search(
+        r"(private\s+fun\s+showOverlay\s*\([^)]*\)\s*\{)",
+        code,
+    )
+    if not match:
+        raise RuntimeError("showOverlay() not found")
+
+    protection = r'''
+        // WINX_SHOW_OVERLAY_PROTECTION
+        if (isWinXLauncher) return
+
+        // WINX_LOCK_SCREEN_SHOW_GUARD
+        if (isWinXLockScreenActive()) {
+            hideWinXOverlayForLockScreen()
+            return
+        }
+
+'''
+    code = code[:match.end()] + protection + code[match.end():]
+
+
+# ============================================================
+# 4.5. KEEP OVERLAY VISIBLE IN FULLSCREEN
+#      Only disable the existing fullscreen auto-hide condition.
+#      Do not change Win-X, clock/date, Gmail, or Swipe/Reveal.
+# ============================================================
+
+if "WINX_FULLSCREEN_STABLE_PATCH" not in code:
+    fullscreen_expr = 'prefs.getBoolean("hide_on_fullscreen", true)'
+    fullscreen_replacement = 'false /* WINX_FULLSCREEN_STABLE_PATCH */'
+
+    if fullscreen_expr in code:
+        code = code.replace(fullscreen_expr, fullscreen_replacement, 1)
+    else:
+        raise RuntimeError("hide_on_fullscreen preference not found")
+
+
+# ============================================================
+# 5. CLOCK + DATE
+# ============================================================
+
+if "WINX_CLOCK_DATE_PATCH" not in code:
+    match = re.search(
+        r"(class\s+NavigationOverlayService[^{]*\{)",
+        code,
+    )
+    if not match:
+        raise RuntimeError("NavigationOverlayService class not found")
+
+    clock_patch = r'''
+
+    // WINX_SHARED_SPACE_SIZE_PATCH
+    // Shared SPACE size:
+    // The horizontal SPACE keeps its original calculated size.
+    // The vertical SPACE will use the same measured dp value.
+    private var winXSpacerSizeDp = 0
+
+    private fun updateWinXSpacerSize(view: View) {
+        try {
+            val sizePx = if (view.width > 0) view.width else view.height
+            if (sizePx > 0) {
+                winXSpacerSizeDp = (sizePx / resources.displayMetrics.density).toInt()
+            }
+        } catch (_: Exception) {
+        }
+    }
+    // WINX_SHARED_SPACE_SIZE_PATCH_END
+
+    // WINX_CLOCK_DATE_PATCH
+
+    private var winXClockTextView: TextView? = null
+
+private var winXDateTextView: TextView? = null
+    private var winXClockStarted = false
+
+    private val winXClockRunnable = object : Runnable {
+        override fun run() {
+            try {
+                val now = Date()
+
+                val timeText = SimpleDateFormat(
+                    "hh:mm a",
+                    Locale.ENGLISH
+                ).format(now)
+                    .replace("AM", "ص")
+                    .replace("PM", "م")
+
+                val dateText = SimpleDateFormat(
+                    "yyyy/MM/dd",
+                    Locale.ENGLISH
+                ).format(now)
+
+                winXClockTextView?.text = timeText
+                winXDateTextView?.text = dateText
+            } catch (_: Exception) {
+            }
+
+            handler.postDelayed(this, 1000)
+        }
+    }
+
+    private fun createWinXClock(
+        textColor: Int,
+        rotation: Float
+    ): LinearLayout {
+
+        val clockLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 0)
+            this.rotation = rotation
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val clock = TextView(this).apply {
+            gravity = Gravity.CENTER
+            isSingleLine = true
+            includeFontPadding = false
+            textSize = 9f
+            typeface = Typeface.DEFAULT
+            setTextColor(textColor)
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val date = TextView(this).apply {
+            gravity = Gravity.CENTER
+            isSingleLine = true
+            includeFontPadding = false
+            textSize = 9f
+            typeface = Typeface.DEFAULT
+            setTextColor(textColor)
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        clockLayout.addView(
+            clock,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        val dateParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dpToPx(1)
+        }
+
+        clockLayout.addView(date, dateParams)
+
+        winXClockTextView = clock
+        winXDateTextView = date
+
+        if (!winXClockStarted) {
+            winXClockStarted = true
+            handler.removeCallbacks(winXClockRunnable)
+            handler.post(winXClockRunnable)
+        }
+
+        return clockLayout
+    }
+
+    // WINX_CLOCK_DATE_PATCH_END
+'''
+
+    code = code[:match.end()] + clock_patch + code[match.end():]
+
+
+# ============================================================
+# 6. INSERT CLOCK WITHOUT REPLACING THE ORIGINAL BUTTON LAYOUT
+#    This keeps all original SwipeInterceptLayout code untouched.
+# ============================================================
+
+if "WINX_CLOCK_LAYOUT_PATCH" not in code:
+    fn = find_function(code, "configureOverlayView")
+    if not fn:
+        raise RuntimeError("configureOverlayView() not found")
+
+    _, fn_open, fn_close = fn
+    body = code[fn_open + 1:fn_close]
+
+    add_match = re.search(r"container\.addView\s*\(\s*frame\s*\)", body)
+    if not add_match:
+        raise RuntimeError("Original navigation button addView(frame) not found")
+
+    abs_add_end = fn_open + 1 + add_match.end()
+    tail = code[abs_add_end:fn_close]
+    loop_close_rel = tail.find("}")
+    if loop_close_rel < 0:
+        raise RuntimeError("Navigation button loop end not found")
+
+    insert_pos = abs_add_end + loop_close_rel + 1
+
+    clock_layout_patch = r'''
+
+        // WINX_CLOCK_LAYOUT_PATCH
+
+        val winXClockRotation = when (position) {
+            "left" -> 90f
+            "right" -> -90f
+            else -> 0f
+        }
+
+        val winXClockView = createWinXClock(
+            buttonColor,
+            winXClockRotation
+        ).apply {
+            isClickable = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isLongClickable = false
+        }
+
+        val winXSpacer = View(this).apply {
             isClickable = false
             isFocusable = false
             isFocusableInTouchMode = false
