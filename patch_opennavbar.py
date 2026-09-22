@@ -1382,6 +1382,56 @@ search_drawable.write_text(
     encoding="utf-8"
 )
 
+
+# ============================================================
+# 8.99. PORTRAIT MUST NEVER AUTO-HIDE
+#      Disable the original short auto-hide path in portrait.
+#      Orientation is now the only normal hide trigger:
+#        - portrait  -> keep visible
+#        - landscape -> rotation logic hides it
+#      Win-X and lock-screen hiding remain allowed.
+# ============================================================
+
+if "WINX_PORTRAIT_NO_AUTO_HIDE" not in code:
+    hide_match = re.search(
+        r"(private\s+fun\s+hideOverlay\s*\([^)]*\)\s*\{)",
+        code,
+    )
+
+    if not hide_match:
+        raise RuntimeError("hideOverlay() not found")
+
+    portrait_guard = r"""
+        // WINX_ROTATION_ONLY_HELPER
+    private fun isWinXLandscapeMode(): Boolean {
+        return try {
+            resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    // WINX_PORTRAIT_NO_AUTO_HIDE
+        // Do not let the original 2-second/auto-hide logic hide the
+        // navigation bar while the device is portrait. The only normal
+        // orientation-based hide is landscape, handled by WINX_ROTATION_HIDE.
+        if (!isWinXLandscapeMode() &&
+            !isWinXLauncher &&
+            !isWinXLockScreenActive()) {
+            autoHideRunnable?.let {
+                handler.removeCallbacks(it)
+            }
+            autoHideRunnable = null
+            isHidden = false
+            isFullscreenHidden = false
+            return
+        }
+
+"""
+
+    code = code[:hide_match.end()] + portrait_guard + code[hide_match.end():]
+
 # ============================================================
 # 9. SAVE
 # ============================================================
