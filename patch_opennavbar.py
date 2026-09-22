@@ -174,6 +174,17 @@ if "WINX_STABLE_PATCH" not in code:
 
 
     private var isWinXLauncher = false
+    private var winXRotationHidden = false
+
+    private fun isWinXLandscapeMode(): Boolean {
+        return try {
+            resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private var winXCheckRunnable: Runnable? = null
     private var winXRestartGraceRunnable: Runnable? = null
     private var winXRestartGraceActive = false
@@ -242,6 +253,24 @@ if "WINX_STABLE_PATCH" not in code:
 
                 val currentPackage = getCurrentForegroundPackage()
 
+                // WINX_ROTATION_HIDE
+                // When the phone is rotated to landscape,
+                // keep the navigation overlay hidden. Return it automatically
+                // when the phone comes back to portrait. Win-X remains handled
+                // independently by the existing package-state logic.
+                if (currentPackage != "com.InternityLabs.Launcher.WinX") {
+                    if (isWinXLandscapeMode()) {
+                        if (!winXRotationHidden) {
+                            winXRotationHidden = true
+                            hideOverlay()
+                        }
+                    } else if (winXRotationHidden) {
+                        winXRotationHidden = false
+                        forceShowAfterWinX()
+                    }
+                }
+                // WINX_ROTATION_HIDE_END
+
                 when {
                     // Win-X is definitely back in the foreground.
                     currentPackage == "com.InternityLabs.Launcher.WinX" -> {
@@ -307,6 +336,11 @@ if "WINX_STABLE_PATCH" not in code:
     }
 
     private fun forceShowAfterWinX() {
+        // WINX_VIDEO_ROTATION_SHOW_GUARD
+        if (isWinXLandscapeMode()) {
+            return
+        }
+
         // WINX_FORCE_SHOW_LOCK_GUARD
         if (isWinXLockScreenActive()) {
             hideWinXOverlayForLockScreen()
@@ -395,28 +429,6 @@ if "WINX_STABLE_EVENT_PATCH" not in code:
         checkWinXStateDelayed()
         scheduleWinXOverlayHealthCheck()
 
-        // WINX_VIDEO_ROTATION_RECOVERY
-        // Video/fullscreen transitions can temporarily detach the overlay
-        // (especially after portrait playback). Once the window transition
-        // finishes, restore the bar automatically instead of requiring a
-        // manual swipe/reveal. Win-X remains the only screen where the bar
-        // is intentionally hidden.
-        if (event != null &&
-            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            handler.postDelayed({
-                try {
-                    val currentPackageAfterTransition = getCurrentForegroundPackage()
-                    if (currentPackageAfterTransition != "com.InternityLabs.Launcher.WinX" &&
-                        currentPackageAfterTransition.isNotEmpty() &&
-                        !isWinXLauncher) {
-                        forceShowAfterWinX()
-                        scheduleWinXOverlayHealthCheck(250L)
-                    }
-                } catch (_: Exception) {
-                }
-            }, 700L)
-        }
-        // WINX_VIDEO_ROTATION_RECOVERY_END
 
         // WINX_STABLE_EVENT_PATCH_END
 
@@ -442,6 +454,9 @@ if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
         // WINX_SHOW_OVERLAY_PROTECTION
         if (isWinXLauncher) return
 
+        // WINX_VIDEO_ROTATION_SHOW_GUARD
+        if (isWinXLandscapeMode()) return
+
         // WINX_LOCK_SCREEN_SHOW_GUARD
         if (isWinXLockScreenActive()) {
             hideWinXOverlayForLockScreen()
@@ -450,22 +465,6 @@ if "WINX_SHOW_OVERLAY_PROTECTION" not in code:
 
 '''
     code = code[:match.end()] + protection + code[match.end():]
-
-
-# ============================================================
-# 4.5. KEEP OVERLAY VISIBLE IN FULLSCREEN
-#      Only disable the existing fullscreen auto-hide condition.
-#      Do not change Win-X, clock/date, Gmail, or Swipe/Reveal.
-# ============================================================
-
-if "WINX_FULLSCREEN_STABLE_PATCH" not in code:
-    fullscreen_expr = 'prefs.getBoolean("hide_on_fullscreen", true)'
-    fullscreen_replacement = 'false /* WINX_FULLSCREEN_STABLE_PATCH */'
-
-    if fullscreen_expr in code:
-        code = code.replace(fullscreen_expr, fullscreen_replacement, 1)
-    else:
-        raise RuntimeError("hide_on_fullscreen preference not found")
 
 
 # ============================================================
