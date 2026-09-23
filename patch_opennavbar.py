@@ -111,23 +111,6 @@ for imp in required_imports:
 
 
 # ============================================================
-# 2. WIN X PACKAGE CONSTANT
-# ============================================================
-
-if "WINX_PACKAGE_CONSTANT_PATCH" not in code:
-    match = re.search(r"(class\s+NavigationOverlayService[^\{]*\{)", code)
-    if not match:
-        raise RuntimeError("NavigationOverlayService class not found")
-
-    package_patch = r'''
-    // WINX_PACKAGE_CONSTANT_PATCH
-    private val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
-    // WINX_PACKAGE_CONSTANT_PATCH_END
-'''
-    code = code[:match.end()] + package_patch + code[match.end():]
-
-
-# ============================================================
 # 2. WIN X STABLE PATCH
 # ============================================================
 
@@ -515,120 +498,6 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
     }
     // WINX_SHARED_SPACE_SIZE_PATCH_END
 
-    // WINX_BACK_LONG_PRESS_START_PATCH
-
-    private var winXStartOpenInProgress = false
-
-    private fun winXFindStartNode(node: android.view.accessibility.AccessibilityNodeInfo?): android.view.accessibility.AccessibilityNodeInfo? {
-        if (node == null) return null
-
-        try {
-            val id = node.viewIdResourceName?.lowercase(Locale.ENGLISH) ?: ""
-            val text = node.text?.toString()?.lowercase(Locale.ENGLISH) ?: ""
-            val desc = node.contentDescription?.toString()?.lowercase(Locale.ENGLISH) ?: ""
-
-            val strongId =
-                id.contains("startview") ||
-                id.contains("start_button") ||
-                id.contains("startbutton") ||
-                id.contains("menu_start")
-
-            val strongText =
-                text == "start" ||
-                text == "ابدأ" ||
-                text == "start menu" ||
-                text == "قائمة ابدأ"
-
-            val strongDesc =
-                desc == "start" ||
-                desc == "start menu" ||
-                desc == "ابدأ" ||
-                desc == "قائمة ابدأ"
-
-            if ((strongId || strongText || strongDesc) &&
-                (node.isClickable || node.isFocusable || node.actionList.isNotEmpty())
-            ) {
-                return android.view.accessibility.AccessibilityNodeInfo.obtain(node)
-            }
-
-            for (i in 0 until node.childCount) {
-                val child = node.getChild(i)
-                val found = winXFindStartNode(child)
-                child?.recycle()
-                if (found != null) return found
-            }
-        } catch (_: Exception) {
-        }
-
-        return null
-    }
-
-    private fun winXClickStartNode(): Boolean {
-        try {
-            val root = rootInActiveWindow ?: return false
-            val node = winXFindStartNode(root) ?: return false
-
-            return try {
-                if (node.isClickable) {
-                    node.performAction(
-                        android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
-                    )
-                } else {
-                    node.performAction(
-                        android.view.accessibility.AccessibilityNodeInfo.ACTION_FOCUS
-                    )
-                    node.performAction(
-                        android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
-                    )
-                }
-            } finally {
-                node.recycle()
-            }
-        } catch (_: Exception) {
-            return false
-        }
-    }
-
-    private fun openWinXStartView() {
-        if (winXStartOpenInProgress) return
-        winXStartOpenInProgress = true
-
-        try {
-            if (rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {
-                if (winXClickStartNode()) {
-                    handler.postDelayed({ winXStartOpenInProgress = false }, 300)
-                    return
-                }
-            }
-
-            val launchIntent = packageManager.getLaunchIntentForPackage(WINX_PACKAGE)
-            if (launchIntent != null) {
-                launchIntent.addFlags(
-                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                    android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                )
-                startActivity(launchIntent)
-            }
-
-            handler.postDelayed({
-                try {
-                    winXClickStartNode()
-                } catch (_: Exception) {
-                }
-                winXStartOpenInProgress = false
-            }, 450)
-        } catch (_: Exception) {
-            winXStartOpenInProgress = false
-        }
-    }
-
-    private fun executeWinXStart() {
-        openWinXStartView()
-    }
-
-
-    // WINX_BACK_LONG_PRESS_START_PATCH_END
-
     // WINX_CLOCK_DATE_PATCH
 
     private var winXClockTextView: TextView? = null
@@ -790,10 +659,6 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
     insert_pos = abs_add_end + loop_close_rel + 1
 
     clock_layout_patch = r'''
-
-        // WINX_BACK_LONG_PRESS_START_PATCH_INSTALL
-        // Uses OpenNavBar's existing Back long-press action system.
-        // No custom View.setOnLongClickListener is attached here.
 
         // WINX_CLOCK_LAYOUT_PATCH
 
@@ -1257,89 +1122,6 @@ if "WINX_CLOCK_GRAVITY_PATCH" not in code:
 
 
 # ============================================================
-# 7.5. WIN-X START VIA EXISTING BACK LONG-PRESS ACTION
-#      Do NOT install a second View long-click listener.
-#      OpenNavBar already supports configurable long-press actions.
-# ============================================================
-
-if "WINX_START_EXECUTE_ACTION_PATCH" not in code:
-    action_fn = None
-    for name in ("executeAction", "performAction", "runAction"):
-        action_fn = find_function(code, name)
-        if action_fn:
-            break
-
-    if not action_fn:
-        raise RuntimeError("OpenNavBar action executor not found")
-
-    action_match, action_open, _ = action_fn
-    signature = code[action_match.start():action_open + 1]
-
-    # Detect the actual String parameter used by this OpenNavBar version.
-    # Do NOT require the parameter to be literally named "action".
-    params_match = re.search(r"\((.*?)\)", signature, re.S)
-    string_params = []
-    if params_match:
-        for pm in re.finditer(
-            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*String\b",
-            params_match.group(1),
-        ):
-            string_params.append(pm.group(1))
-
-    if not string_params:
-        raise RuntimeError(
-            "Action executor found, but no String action parameter could be identified"
-        )
-
-    action_param = None
-    for n in (
-        "action",
-        "actionType",
-        "actionName",
-        "selectedAction",
-        "longPressAction",
-        "command",
-    ):
-        if n in string_params:
-            action_param = n
-            break
-
-    if action_param is None and len(string_params) == 1:
-        action_param = string_params[0]
-
-    if action_param is None:
-        raise RuntimeError(
-            "Action executor has multiple String parameters; cannot identify the action parameter safely"
-        )
-
-    # Remember the real executor name; do not hard-code executeAction().
-    action_executor_name = re.search(
-        r"fun\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", signature
-    ).group(1)
-
-    action_inject = (
-        "\n        // WINX_SHOW_NAVBAR_START_PATCH\n"
-        "        val winXActionName = "
-        f"{action_param}.trim().lowercase(java.util.Locale.ENGLISH).replace(\"_\", \"\").replace(\"-\", \"\").replace(\" \", \"\")\n"
-        f"        val winXIsForeground = isWinXLauncher || rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE\n"
-        f"        if (winXIsForeground && (winXActionName == \"shownavbar\" || winXActionName == \"shownavigationbar\")) {{\n"
-        "            executeWinXStart()\n"
-        "            return\n"
-        "        }\n"
-        "        // WINX_SHOW_NAVBAR_START_PATCH_END\n\n"
-        "        // WINX_START_EXECUTE_ACTION_PATCH\n"
-        f"        if ({action_param}.trim() == \"winx_start\") {{\n"
-        "            executeWinXStart()\n"
-        "            return\n"
-        "        }\n"
-        "        // WINX_START_EXECUTE_ACTION_PATCH_END\n\n"
-    )
-    code = code[:action_open + 1] + action_inject + code[action_open + 1:]
-
-# Back long-press routing intentionally removed.
-# WINX_START is triggered only by the existing Show Navbar action.
-
-# ============================================================
 # 8. CLOCK CLEANUP
 # ============================================================
 
@@ -1602,8 +1384,31 @@ search_drawable.write_text(
 
 
 # ============================================================
-# 8.99. PORTRAIT MUST NEVER AUTO-HIDE
-#      Disable the original short auto-hide path in portrait.
+# 9. SAVE
+# ============================================================
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(code)
+
+print("================================================")
+print(" OPENNAVBAR WIN X + CLOCK + LOCK SCREEN FIX")
+print("================================================")
+print("")
+print("Win X package:")
+print(WINX_PACKAGE)
+print("")
+print("Win X: hide only on Win X launcher")
+print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
+print("Gmail: custom supplied icon / 16dp")
+print("Gmail: 16dp icon / beside Home on clock side")
+print("Xiaomi Community: removed")
+print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
+print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
+print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
+print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
+print("================================================")
+print("PATCH COMPLETE")
+print("================================================")
 #      Orientation is now the only normal hide trigger:
 #        - portrait  -> keep visible
 #        - landscape -> rotation logic hides it
