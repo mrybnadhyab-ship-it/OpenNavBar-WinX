@@ -1255,19 +1255,59 @@ if "WINX_START_EXECUTE_ACTION_PATCH" not in code:
     if not action_fn:
         raise RuntimeError("OpenNavBar action executor not found")
 
-    _, action_open, _ = action_fn
-    action_inject = r'''
-        // WINX_START_EXECUTE_ACTION_PATCH
-        if (action == "winx_start") {
-            executeWinXStart()
-            return
-        }
-        // WINX_START_EXECUTE_ACTION_PATCH_END
+    action_match, action_open, _ = action_fn
+    signature = code[action_match.start():action_open + 1]
 
-'''
-    sig_text = code[max(0, action_open - 500):action_open]
-    if not re.search(r"\baction\s*:\s*String", sig_text):
-        raise RuntimeError("Action executor found, but its action parameter is not named 'action'")
+    # Detect the actual String parameter used by this OpenNavBar version.
+    # Do NOT require the parameter to be literally named "action".
+    params_match = re.search(r"\((.*?)\)", signature, re.S)
+    string_params = []
+    if params_match:
+        for pm in re.finditer(
+            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*String\b",
+            params_match.group(1),
+        ):
+            string_params.append(pm.group(1))
+
+    if not string_params:
+        raise RuntimeError(
+            "Action executor found, but no String action parameter could be identified"
+        )
+
+    action_param = None
+    for n in (
+        "action",
+        "actionType",
+        "actionName",
+        "selectedAction",
+        "longPressAction",
+        "command",
+    ):
+        if n in string_params:
+            action_param = n
+            break
+
+    if action_param is None and len(string_params) == 1:
+        action_param = string_params[0]
+
+    if action_param is None:
+        raise RuntimeError(
+            "Action executor has multiple String parameters; cannot identify the action parameter safely"
+        )
+
+    # Remember the real executor name; do not hard-code executeAction().
+    action_executor_name = re.search(
+        r"fun\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", signature
+    ).group(1)
+
+    action_inject = (
+        "\n        // WINX_START_EXECUTE_ACTION_PATCH\n"
+        f"        if ({action_param} == \"winx_start\") {{\n"
+        "            executeWinXStart()\n"
+        "            return\n"
+        "        }\n"
+        "        // WINX_START_EXECUTE_ACTION_PATCH_END\n\n"
+    )
     code = code[:action_open + 1] + action_inject + code[action_open + 1:]
 
 if "WINX_START_LONG_PRESS_ROUTING_PATCH" not in code:
@@ -1305,7 +1345,7 @@ if "WINX_START_LONG_PRESS_ROUTING_PATCH" not in code:
     if not button_param or not action_param:
         raise RuntimeError("Back long-press handler found, but button/action parameters could not be identified safely")
 
-    routing = f'''\n        // WINX_START_LONG_PRESS_ROUTING_PATCH\n        if ({button_param} == "back" &&\n            rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {{\n            executeAction("winx_start")\n            return\n        }}\n        // WINX_START_LONG_PRESS_ROUTING_PATCH_END\n\n'''
+    routing = f'''\n        // WINX_START_LONG_PRESS_ROUTING_PATCH\n        if ({button_param} == "back" &&\n            rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {{\n            {action_executor_name}("winx_start")\n            return\n        }}\n        // WINX_START_LONG_PRESS_ROUTING_PATCH_END\n\n'''
     code = code[:long_open + 1] + routing + code[long_open + 1:]
 
 
