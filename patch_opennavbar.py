@@ -498,6 +498,120 @@ if "WINX_CLOCK_DATE_PATCH" not in code:
     }
     // WINX_SHARED_SPACE_SIZE_PATCH_END
 
+    // WINX_BACK_LONG_PRESS_START_PATCH
+
+    private var winXStartOpenInProgress = false
+
+    private fun winXFindStartNode(node: android.view.accessibility.AccessibilityNodeInfo?): android.view.accessibility.AccessibilityNodeInfo? {
+        if (node == null) return null
+
+        try {
+            val id = node.viewIdResourceName?.lowercase(Locale.ENGLISH) ?: ""
+            val text = node.text?.toString()?.lowercase(Locale.ENGLISH) ?: ""
+            val desc = node.contentDescription?.toString()?.lowercase(Locale.ENGLISH) ?: ""
+
+            val strongId =
+                id.contains("startview") ||
+                id.contains("start_button") ||
+                id.contains("startbutton") ||
+                id.contains("menu_start")
+
+            val strongText =
+                text == "start" ||
+                text == "ابدأ" ||
+                text == "start menu" ||
+                text == "قائمة ابدأ"
+
+            val strongDesc =
+                desc == "start" ||
+                desc == "start menu" ||
+                desc == "ابدأ" ||
+                desc == "قائمة ابدأ"
+
+            if ((strongId || strongText || strongDesc) &&
+                (node.isClickable || node.isFocusable || node.actionList.isNotEmpty())
+            ) {
+                return android.view.accessibility.AccessibilityNodeInfo.obtain(node)
+            }
+
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i)
+                val found = winXFindStartNode(child)
+                child?.recycle()
+                if (found != null) return found
+            }
+        } catch (_: Exception) {
+        }
+
+        return null
+    }
+
+    private fun winXClickStartNode(): Boolean {
+        try {
+            val root = rootInActiveWindow ?: return false
+            val node = winXFindStartNode(root) ?: return false
+
+            return try {
+                if (node.isClickable) {
+                    node.performAction(
+                        android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+                    )
+                } else {
+                    node.performAction(
+                        android.view.accessibility.AccessibilityNodeInfo.ACTION_FOCUS
+                    )
+                    node.performAction(
+                        android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+                    )
+                }
+            } finally {
+                node.recycle()
+            }
+        } catch (_: Exception) {
+            return false
+        }
+    }
+
+    private fun openWinXStartView() {
+        if (winXStartOpenInProgress) return
+        winXStartOpenInProgress = true
+
+        try {
+            if (rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {
+                if (winXClickStartNode()) {
+                    handler.postDelayed({ winXStartOpenInProgress = false }, 300)
+                    return
+                }
+            }
+
+            val launchIntent = packageManager.getLaunchIntentForPackage(WINX_PACKAGE)
+            if (launchIntent != null) {
+                launchIntent.addFlags(
+                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                )
+                startActivity(launchIntent)
+            }
+
+            handler.postDelayed({
+                try {
+                    winXClickStartNode()
+                } catch (_: Exception) {
+                }
+                winXStartOpenInProgress = false
+            }, 450)
+        } catch (_: Exception) {
+            winXStartOpenInProgress = false
+        }
+    }
+
+    private fun executeWinXStart() {
+        openWinXStartView()
+    }
+
+
+    // WINX_BACK_LONG_PRESS_START_PATCH_END
+
     // WINX_CLOCK_DATE_PATCH
 
     private var winXClockTextView: TextView? = null
@@ -659,6 +773,10 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
     insert_pos = abs_add_end + loop_close_rel + 1
 
     clock_layout_patch = r'''
+
+        // WINX_BACK_LONG_PRESS_START_PATCH_INSTALL
+        // Uses OpenNavBar's existing Back long-press action system.
+        // No custom View.setOnLongClickListener is attached here.
 
         // WINX_CLOCK_LAYOUT_PATCH
 
@@ -1119,6 +1237,125 @@ if "WINX_CLOCK_GRAVITY_PATCH" not in code:
         code = code.replace(old, new, 1)
     else:
         print("Warning: container.gravity line not found; leaving original gravity")
+
+
+# ============================================================
+# 7.5. WIN-X START VIA EXISTING BACK LONG-PRESS ACTION
+#      Do NOT install a second View long-click listener.
+#      OpenNavBar already supports configurable long-press actions.
+# ============================================================
+
+if "WINX_START_EXECUTE_ACTION_PATCH" not in code:
+    action_fn = None
+    for name in ("executeAction", "performAction", "runAction"):
+        action_fn = find_function(code, name)
+        if action_fn:
+            break
+
+    if not action_fn:
+        raise RuntimeError("OpenNavBar action executor not found")
+
+    action_match, action_open, _ = action_fn
+    signature = code[action_match.start():action_open + 1]
+
+    # Detect the actual String parameter used by this OpenNavBar version.
+    # Do NOT require the parameter to be literally named "action".
+    params_match = re.search(r"\((.*?)\)", signature, re.S)
+    string_params = []
+    if params_match:
+        for pm in re.finditer(
+            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*String\b",
+            params_match.group(1),
+        ):
+            string_params.append(pm.group(1))
+
+    if not string_params:
+        raise RuntimeError(
+            "Action executor found, but no String action parameter could be identified"
+        )
+
+    action_param = None
+    for n in (
+        "action",
+        "actionType",
+        "actionName",
+        "selectedAction",
+        "longPressAction",
+        "command",
+    ):
+        if n in string_params:
+            action_param = n
+            break
+
+    if action_param is None and len(string_params) == 1:
+        action_param = string_params[0]
+
+    if action_param is None:
+        raise RuntimeError(
+            "Action executor has multiple String parameters; cannot identify the action parameter safely"
+        )
+
+    # Remember the real executor name; do not hard-code executeAction().
+    action_executor_name = re.search(
+        r"fun\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", signature
+    ).group(1)
+
+    action_inject = (
+        "\n        // WINX_SHOW_NAVBAR_START_PATCH\n"
+        f"        if (({action_param} == \"show_navbar\" || "
+        f"{action_param} == \"showNavbar\" || "
+        f"{action_param} == \"show_navbar_action\") && "
+        f"rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {{\n"
+        "            executeWinXStart()\n"
+        "            return\n"
+        "        }\n"
+        "        // WINX_SHOW_NAVBAR_START_PATCH_END\n\n"
+        "        // WINX_START_EXECUTE_ACTION_PATCH\n"
+        f"        if ({action_param} == \"winx_start\") {{\n"
+        "            executeWinXStart()\n"
+        "            return\n"
+        "        }\n"
+        "        // WINX_START_EXECUTE_ACTION_PATCH_END\n\n"
+    )
+    code = code[:action_open + 1] + action_inject + code[action_open + 1:]
+
+if "WINX_START_LONG_PRESS_ROUTING_PATCH" not in code:
+    long_fn = None
+    for name in (
+        "handleLongPress",
+        "handleLongpress",
+        "executeLongPress",
+        "performLongPressAction",
+        "onLongPressAction",
+    ):
+        candidate = find_function(code, name)
+        if candidate:
+            long_fn = candidate
+            break
+
+    if not long_fn:
+        raise RuntimeError("Existing Back long-press handler not found")
+
+    m, long_open, long_close = long_fn
+    signature = code[m.start():long_open + 1]
+
+    button_param = None
+    for n in ("buttonType", "button", "buttonName", "type"):
+        if re.search(rf"\b{n}\s*:\s*String", signature):
+            button_param = n
+            break
+
+    action_param = None
+    for n in ("action", "longPressAction", "actionName"):
+        if re.search(rf"\b{n}\s*:\s*String", signature):
+            action_param = n
+            break
+
+    if not button_param or not action_param:
+        raise RuntimeError("Back long-press handler found, but button/action parameters could not be identified safely")
+
+    routing = f'''\n        // WINX_START_LONG_PRESS_ROUTING_PATCH\n        if ({button_param} == "back" &&\n            rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {{\n            {action_executor_name}("winx_start")\n            return\n        }}\n        // WINX_START_LONG_PRESS_ROUTING_PATCH_END\n\n'''
+    code = code[:long_open + 1] + routing + code[long_open + 1:]
 
 
 # ============================================================
