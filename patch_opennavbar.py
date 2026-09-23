@@ -122,6 +122,11 @@ if "WINX_STABLE_PATCH" not in code:
     winx_patch = r'''
 
     // WINX_STABLE_PATCH
+    // WINX_PACKAGE_CONSTANT_PATCH
+    private companion object {
+        private const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
+    }
+
     // WINX_OVERLAY_HEALTH_PATCH
 
     private var winXOverlayHealthRunnable: Runnable? = null
