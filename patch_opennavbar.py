@@ -123,9 +123,7 @@ if "WINX_STABLE_PATCH" not in code:
 
     // WINX_STABLE_PATCH
     // WINX_PACKAGE_CONSTANT_PATCH
-    private companion object {
-        private const val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
-    }
+    private val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
 
     // WINX_OVERLAY_HEALTH_PATCH
 
