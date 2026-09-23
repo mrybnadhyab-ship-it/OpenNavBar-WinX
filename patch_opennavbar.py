@@ -1319,44 +1319,8 @@ if "WINX_START_EXECUTE_ACTION_PATCH" not in code:
     )
     code = code[:action_open + 1] + action_inject + code[action_open + 1:]
 
-if "WINX_START_LONG_PRESS_ROUTING_PATCH" not in code:
-    long_fn = None
-    for name in (
-        "handleLongPress",
-        "handleLongpress",
-        "executeLongPress",
-        "performLongPressAction",
-        "onLongPressAction",
-    ):
-        candidate = find_function(code, name)
-        if candidate:
-            long_fn = candidate
-            break
-
-    if not long_fn:
-        raise RuntimeError("Existing Back long-press handler not found")
-
-    m, long_open, long_close = long_fn
-    signature = code[m.start():long_open + 1]
-
-    button_param = None
-    for n in ("buttonType", "button", "buttonName", "type"):
-        if re.search(rf"\b{n}\s*:\s*String", signature):
-            button_param = n
-            break
-
-    action_param = None
-    for n in ("action", "longPressAction", "actionName"):
-        if re.search(rf"\b{n}\s*:\s*String", signature):
-            action_param = n
-            break
-
-    if not button_param or not action_param:
-        raise RuntimeError("Back long-press handler found, but button/action parameters could not be identified safely")
-
-    routing = f'''\n        // WINX_START_LONG_PRESS_ROUTING_PATCH\n        if ({button_param} == "back" &&\n            rootInActiveWindow?.packageName?.toString() == WINX_PACKAGE) {{\n            {action_executor_name}("winx_start")\n            return\n        }}\n        // WINX_START_LONG_PRESS_ROUTING_PATCH_END\n\n'''
-    code = code[:long_open + 1] + routing + code[long_open + 1:]
-
+# Back long-press routing intentionally removed.
+# WINX_START is triggered only by the existing Show Navbar action.
 
 # ============================================================
 # 8. CLOCK CLEANUP
