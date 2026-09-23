@@ -111,6 +111,23 @@ for imp in required_imports:
 
 
 # ============================================================
+# 2. WIN X PACKAGE CONSTANT
+# ============================================================
+
+if "WINX_PACKAGE_CONSTANT_PATCH" not in code:
+    match = re.search(r"(class\s+NavigationOverlayService[^\{]*\{)", code)
+    if not match:
+        raise RuntimeError("NavigationOverlayService class not found")
+
+    package_patch = r'''
+    // WINX_PACKAGE_CONSTANT_PATCH
+    private val WINX_PACKAGE = "com.InternityLabs.Launcher.WinX"
+    // WINX_PACKAGE_CONSTANT_PATCH_END
+'''
+    code = code[:match.end()] + package_patch + code[match.end():]
+
+
+# ============================================================
 # 2. WIN X STABLE PATCH
 # ============================================================
 
