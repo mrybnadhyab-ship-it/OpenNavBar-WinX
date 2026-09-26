@@ -371,6 +371,33 @@ if "WINX_STABLE_PATCH" not in code:
     // WINX_STABLE_PATCH_END
 
 
+    // WINX_LONG_PRESS_HIDE_PATCH
+    private var winXLongPressHideRequested = false
+
+    private fun winXEnableLongPressHide(view: View) {
+        try {
+            view.isLongClickable = true
+            view.setOnLongClickListener {
+                try {
+                    if (!isWinXLauncher && !isWinXLockScreenActive()) {
+                        winXLongPressHideRequested = true
+                        try {
+                            hideOverlay()
+                        } finally {
+                            winXLongPressHideRequested = false
+                        }
+                    }
+                } catch (_: Exception) {
+                    winXLongPressHideRequested = false
+                }
+                true
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    // WINX_LONG_PRESS_HIDE_PATCH_END
+
     // WINX_LOCK_SCREEN_GUARD_PATCH
     // Never allow OpenNavBar to be visible while the Android keyguard/lock
     // screen is active. This is intentionally independent of Win-X state.
@@ -646,6 +673,18 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
     _, fn_open, fn_close = fn
     body = code[fn_open + 1:fn_close]
 
+    if "winXEnableLongPressHide(frame)" not in code:
+        bind_old = "container.addView(frame)"
+        bind_new = "winXEnableLongPressHide(frame)\n            container.addView(frame)"
+        if bind_old not in code:
+            raise RuntimeError("Original navigation button addView(frame) not found")
+        code = code.replace(bind_old, bind_new, 1)
+        fn = find_function(code, "configureOverlayView")
+        if not fn:
+            raise RuntimeError("configureOverlayView() not found after long-press binding")
+        _, fn_open, fn_close = fn
+        body = code[fn_open + 1:fn_close]
+
     add_match = re.search(r"container\.addView\s*\(\s*frame\s*\)", body)
     if not add_match:
         raise RuntimeError("Original navigation button addView(frame) not found")
@@ -818,7 +857,10 @@ isLongClickable = false
                     } catch (_: Exception) {
                     }
                 }
+
             }
+
+        winXEnableLongPressHide(winXGmailButton)
         }
 
       // WINX_MICROSOFT_BUTTON_PATCH
@@ -885,7 +927,10 @@ addView(
                     } catch (_: Exception) {
                     }
                 }
+
             }
+
+        winXEnableLongPressHide(winXMicrosoftButton)
 
         // WINX_MICROSOFT_BUTTON_PATCH_END
 
@@ -944,12 +989,14 @@ addView(
                         }
                     }
                 }
+
             }
+
+        winXEnableLongPressHide(winXShowHiddenButton)
 
         // WINX_SEARCH_BUTTON_PATCH
         // Windows 10-style Search icon.
-        // Fixed 40dp slot; magnifying-glass direction matches the reference:
-        // circular lens with the handle running diagonally down-left.
+        // Fixed 40dp slot; the handle points diagonally down-right toward Home.
         val winXSearchButton =
             android.widget.FrameLayout(this).apply {
 
@@ -1005,7 +1052,10 @@ addView(
                         }
                     }
                 }
+
             }
+
+        winXEnableLongPressHide(winXSearchButton)
 
         // WINX_SEARCH_BUTTON_PATCH_END
 
@@ -1020,8 +1070,8 @@ addView(
                 winXGmailButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(38),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1029,8 +1079,8 @@ addView(
                 winXMicrosoftButton,
                 4,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1038,8 +1088,8 @@ addView(
                 winXShowHiddenButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1047,8 +1097,8 @@ addView(
                 winXSearchButton,
                 7,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1059,8 +1109,8 @@ addView(
                 winXMicrosoftButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1068,8 +1118,8 @@ addView(
                 winXGmailButton,
                 3,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1077,8 +1127,8 @@ addView(
                 winXShowHiddenButton,
                 5,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1086,8 +1136,8 @@ addView(
                 winXSearchButton,
                 1,
                 LinearLayout.LayoutParams(
-                    dpToPx(40),
-                    dpToPx(40),
+                    dpToPx(36),
+                    dpToPx(36),
                     0f
                 )
             )
@@ -1354,8 +1404,8 @@ show_hidden_drawable.write_text(
 
 # ============================================================
 # 8.96. WINDOWS 10 SEARCH ICON
-#      18dp magnifying glass, with the handle pointing down-left
-#      like the reference image. The button slot remains 40dp.
+#      16dp magnifying glass, with the handle pointing down-right
+#      toward Home in the normal layout. The button slot remains 40dp.
 # ============================================================
 
 search_vector = """<?xml version="1.0" encoding="utf-8"?>
@@ -1371,7 +1421,7 @@ search_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:strokeWidth="1.7"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M3.8,10.9 L0.2,14.5" />
+        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M10.8,10.9 L14.4,14.5" />
 
 </vector>
 """
@@ -1384,31 +1434,8 @@ search_drawable.write_text(
 
 
 # ============================================================
-# 9. SAVE
-# ============================================================
-
-with open(path, "w", encoding="utf-8") as f:
-    f.write(code)
-
-print("================================================")
-print(" OPENNAVBAR WIN X + CLOCK + LOCK SCREEN FIX")
-print("================================================")
-print("")
-print("Win X package:")
-print(WINX_PACKAGE)
-print("")
-print("Win X: hide only on Win X launcher")
-print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
-print("Gmail: custom supplied icon / 16dp")
-print("Gmail: 16dp icon / beside Home on clock side")
-print("Xiaomi Community: removed")
-print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
-print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
-print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
-print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
-print("================================================")
-print("PATCH COMPLETE")
-print("================================================")
+# 8.99. PORTRAIT MUST NEVER AUTO-HIDE
+#      Disable the original short auto-hide path in portrait.
 #      Orientation is now the only normal hide trigger:
 #        - portrait  -> keep visible
 #        - landscape -> rotation logic hides it
@@ -1431,7 +1458,8 @@ if "WINX_PORTRAIT_NO_AUTO_HIDE" not in code:
         // orientation-based hide is landscape, handled by WINX_ROTATION_HIDE.
         if (!isWinXLandscapeMode() &&
             !isWinXLauncher &&
-            !isWinXLockScreenActive()) {
+            !isWinXLockScreenActive() &&
+            !winXLongPressHideRequested) {
             autoHideRunnable?.let {
                 handler.removeCallbacks(it)
             }
