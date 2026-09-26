@@ -992,7 +992,7 @@ addView(
 
         // WINX_SEARCH_BUTTON_PATCH
         // Windows 10-style Search icon.
-        // Fixed 40dp slot; the handle points diagonally down-right toward Home.
+        // Fixed 32dp slot; the handle points diagonally down-left toward Back.
         val winXSearchButton =
             android.widget.FrameLayout(this).apply {
 
@@ -1065,8 +1065,8 @@ addView(
                 winXGmailButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1074,8 +1074,8 @@ addView(
                 winXMicrosoftButton,
                 4,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1083,8 +1083,8 @@ addView(
                 winXShowHiddenButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1092,20 +1092,20 @@ addView(
                 winXSearchButton,
                 7,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
         } else {
             // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
-            // Every taskbar button uses the same 40dp slot for even distribution.
+            // Every custom taskbar button uses the same 32dp slot for even distribution.
             container.addView(
                 winXMicrosoftButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1113,8 +1113,8 @@ addView(
                 winXGmailButton,
                 3,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1122,8 +1122,8 @@ addView(
                 winXShowHiddenButton,
                 5,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1131,8 +1131,8 @@ addView(
                 winXSearchButton,
                 1,
                 LinearLayout.LayoutParams(
-                    dpToPx(36),
-                    dpToPx(36),
+                    dpToPx(32),
+                    dpToPx(32),
                     0f
                 )
             )
@@ -1416,7 +1416,7 @@ search_vector = """<?xml version="1.0" encoding="utf-8"?>
         android:strokeWidth="1.7"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M7.4,2.6 A4.8,4.8 0,1 0,7.4,12.2 A4.8,4.8 0,1 0,7.4,2.6 M10.8,10.9 L14.4,14.5" />
+        android:pathData="M10.6,2.6 A4.8,4.8 0,1 0,10.6,12.2 A4.8,4.8 0,1 0,10.6,2.6 M7.2,10.9 L3.6,14.5" />
 
 </vector>
 """
@@ -1488,7 +1488,7 @@ print("Gmail: custom supplied icon / 16dp")
 print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
 print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
-print("Search: Windows 10-style magnifying glass / between Back and Home / 40dp button slot")
+print("Search: Windows 10-style magnifying glass / between Back and Home / 32dp button slot")
 print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
 print("================================================")
