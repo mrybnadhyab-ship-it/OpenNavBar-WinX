@@ -1097,6 +1097,13 @@ addView(
                     0f
                 )
             )
+
+            // Move Microsoft 32dp toward Home, and move Gmail by the same
+            // 32dp so the Microsoft <-> Gmail spacing stays unchanged.
+            winXMicrosoftButton.translationX =
+                dpToPx(32).toFloat()
+            winXGmailButton.translationX =
+                dpToPx(32).toFloat()
         } else {
             // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
             // Every custom taskbar button uses the same 32dp slot for even distribution.
@@ -1136,6 +1143,14 @@ addView(
                     0f
                 )
             )
+
+            // Move Microsoft 32dp toward Home, and move Gmail by the same
+            // 32dp so the Microsoft <-> Gmail spacing stays unchanged.
+            winXMicrosoftButton.translationX =
+                -dpToPx(32).toFloat()
+            winXGmailButton.translationX =
+                -dpToPx(32).toFloat()
+
         // WINX_SHOW_HIDDEN_ICONS_PATCH_END
         }
         // WINX_GMAIL_POSITION_PATCH_END
