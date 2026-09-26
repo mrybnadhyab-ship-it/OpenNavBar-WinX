@@ -1104,12 +1104,7 @@ addView(
             )
 
             // Swapped direction: Home is to the right.
-            // Balanced spacing: move Microsoft farther toward Home while
-            // keeping Gmail unchanged.
-            // Final visual balance: move Microsoft 12dp closer to Home.
-            // Gmail remains unchanged.
-            winXMicrosoftButton.translationX =
-                dpToPx(75).toFloat()
+            // Gmail keeps its 32dp visual offset.
             winXGmailButton.translationX =
                 dpToPx(32).toFloat()
 
@@ -1160,6 +1155,16 @@ addView(
 
         // WINX_SHOW_HIDDEN_ICONS_PATCH_END
         }
+
+        // FORCE MICROSOFT TOWARD HOME
+        // Apply after layout so the translation is not overwritten.
+        if (shouldSwap) {
+            winXMicrosoftButton.post {
+                winXMicrosoftButton.translationX =
+                    dpToPx(75).toFloat()
+            }
+        }
+
         // WINX_GMAIL_POSITION_PATCH_END
 
         // WINX_CLOCK_LAYOUT_PATCH_END
