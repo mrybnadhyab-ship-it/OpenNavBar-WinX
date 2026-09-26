@@ -685,17 +685,16 @@ if "WINX_CLOCK_LAYOUT_PATCH" not in code:
         _, fn_open, fn_close = fn
         body = code[fn_open + 1:fn_close]
 
-    add_match = re.search(r"container\.addView\s*\(\s*frame\s*\)", body)
-    if not add_match:
-        raise RuntimeError("Original navigation button addView(frame) not found")
+    loop_match = re.search(r"order\.forEachIndexed\s*\{", body)
+    if not loop_match:
+        raise RuntimeError("Original navigation button order loop not found")
 
-    abs_add_end = fn_open + 1 + add_match.end()
-    tail = code[abs_add_end:fn_close]
-    loop_close_rel = tail.find("}")
+    loop_open_rel = body.find("{", loop_match.start(), loop_match.end())
+    loop_close_rel = find_matching_brace(body, loop_open_rel)
     if loop_close_rel < 0:
         raise RuntimeError("Navigation button loop end not found")
 
-    insert_pos = abs_add_end + loop_close_rel + 1
+    insert_pos = fn_open + 1 + loop_close_rel + 1
 
     clock_layout_patch = r'''
 
@@ -860,7 +859,6 @@ isLongClickable = false
 
             }
 
-        winXEnableLongPressHide(winXGmailButton)
         }
 
       // WINX_MICROSOFT_BUTTON_PATCH
@@ -930,7 +928,6 @@ addView(
 
             }
 
-        winXEnableLongPressHide(winXMicrosoftButton)
 
         // WINX_MICROSOFT_BUTTON_PATCH_END
 
@@ -992,7 +989,6 @@ addView(
 
             }
 
-        winXEnableLongPressHide(winXShowHiddenButton)
 
         // WINX_SEARCH_BUTTON_PATCH
         // Windows 10-style Search icon.
@@ -1055,7 +1051,6 @@ addView(
 
             }
 
-        winXEnableLongPressHide(winXSearchButton)
 
         // WINX_SEARCH_BUTTON_PATCH_END
 
