@@ -1055,6 +1055,11 @@ addView(
         // WINX_SEARCH_BUTTON_PATCH_END
 
         // WINX_GMAIL_POSITION_PATCH
+        // Allow the custom buttons to move visually outside their 32dp slots.
+        // This is required for the exact 32dp shift toward Home.
+        container.clipChildren = false
+        container.clipToPadding = false
+
         // shouldSwap: Recent | Clock | ShowHidden | Gmail | SPACE | Microsoft | Home | Back
         // normal:    Back | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
         if (shouldSwap) {
@@ -1098,12 +1103,14 @@ addView(
                 )
             )
 
-            // Move Microsoft 32dp toward Home, and move Gmail by the same
-            // 32dp so the Microsoft <-> Gmail spacing stays unchanged.
-            winXMicrosoftButton.translationX =
-                dpToPx(32).toFloat()
+            // Swapped direction: Home is to the right.
+            // Keep Microsoft in its Home-side position and move Gmail
+            // 32dp toward Home, making the Microsoft <-> Gmail spacing
+            // exactly 32dp.
+            winXMicrosoftButton.translationX = 0f
             winXGmailButton.translationX =
                 dpToPx(32).toFloat()
+
         } else {
             // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
             // Every custom taskbar button uses the same 32dp slot for even distribution.
@@ -1144,12 +1151,10 @@ addView(
                 )
             )
 
-            // Move Microsoft 32dp toward Home, and move Gmail by the same
-            // 32dp so the Microsoft <-> Gmail spacing stays unchanged.
-            winXMicrosoftButton.translationX =
-                -dpToPx(32).toFloat()
-            winXGmailButton.translationX =
-                -dpToPx(32).toFloat()
+            // Normal direction: Microsoft and Gmail are already adjacent
+            // to Home with an exact 32dp center-to-center spacing.
+            winXMicrosoftButton.translationX = 0f
+            winXGmailButton.translationX = 0f
 
         // WINX_SHOW_HIDDEN_ICONS_PATCH_END
         }
@@ -1502,7 +1507,7 @@ print("Clock: 9sp time / 9sp date / group rotation / 1dp gap / non-touch")
 print("Gmail: custom supplied icon / 16dp")
 print("Gmail: 16dp icon / beside Home on clock side")
 print("Xiaomi Community: removed")
-print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 32dp button slot")
+print("Microsoft: EXACT Adobe_20230903_191353.png / 20dp visible logo / overlay health recovery / Windows-style 40dp button slots")
 print("Search: Windows 10-style magnifying glass / between Back and Home / 32dp button slot")
 print("Lock screen: OpenNavBar hidden until USER_PRESENT / real unlock")
 print("Swipe: ORIGINAL SWIPE/REVEAL CODE PRESERVED")
