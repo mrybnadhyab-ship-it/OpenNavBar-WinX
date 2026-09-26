@@ -1104,9 +1104,10 @@ addView(
             )
 
             // Swapped direction: Home is to the right.
-            // Move Microsoft 29dp toward Home only.
+            // Move Microsoft 16dp toward Home so the Home <-> Microsoft
+            // distance becomes exactly equal to the Microsoft <-> Gmail distance.
             winXMicrosoftButton.translationX =
-                dpToPx(29).toFloat()
+                dpToPx(16).toFloat()
             winXGmailButton.translationX =
                 dpToPx(32).toFloat()
 
