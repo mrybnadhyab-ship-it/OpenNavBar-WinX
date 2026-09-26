@@ -1075,7 +1075,12 @@ addView(
                 dpToPx(32),
                 0f
             ).apply {
-                leftMargin = dpToPx(8)
+                // In the swapped layout Microsoft is to the RIGHT of Gmail.
+                // Use a real layout margin on Gmail's RIGHT side so the gap
+                // between Gmail and Microsoft increases without translationX.
+                // 21dp is the measured difference needed to match the
+                // Microsoft-to-Home visual spacing.
+                rightMargin = dpToPx(21)
             }
             container.addView(
                 winXGmailButton,
