@@ -1104,10 +1104,10 @@ addView(
             )
 
             // Swapped direction: Home is to the right.
-            // Move Gmail left so the Gmail→Microsoft distance
-            // matches the Microsoft→Home distance.
-            winXGmailButton.translationX =
-                dpToPx(20).toFloat()
+            // Gmail must move LEFT, away from Microsoft.
+            // Target: Gmail→Microsoft = Microsoft→Home.
+            // The measured difference is approximately 21dp.
+            // Apply the final visual offset after layout below.
 
         } else {
             // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
@@ -1157,12 +1157,13 @@ addView(
         // WINX_SHOW_HIDDEN_ICONS_PATCH_END
         }
 
-        // FORCE MICROSOFT TOWARD HOME
+        // FORCE GMAIL AWAY FROM MICROSOFT
         // Apply after layout so the translation is not overwritten.
+        // Microsoft and Home stay exactly where they are.
         if (shouldSwap) {
-            winXMicrosoftButton.post {
-                winXMicrosoftButton.translationX =
-                    dpToPx(75).toFloat()
+            winXGmailButton.post {
+                winXGmailButton.translationX =
+                    -dpToPx(21).toFloat()
             }
         }
 
