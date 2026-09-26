@@ -1107,7 +1107,7 @@ addView(
             // Balanced spacing: move Microsoft farther toward Home while
             // keeping Gmail unchanged.
             winXMicrosoftButton.translationX =
-                dpToPx(39).toFloat()
+                dpToPx(51).toFloat()
             winXGmailButton.translationX =
                 dpToPx(32).toFloat()
 
