@@ -1135,8 +1135,8 @@ addView(
                 winXGmailButton,
                 3,
                 LinearLayout.LayoutParams(
-                    dpToPx(42),
-                    dpToPx(42),
+                    dpToPx(44),
+                    dpToPx(44),
                     0f
                 )
             )
