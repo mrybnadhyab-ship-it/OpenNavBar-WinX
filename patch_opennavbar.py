@@ -1104,9 +1104,10 @@ addView(
             )
 
             // Swapped direction: Home is to the right.
-            // Gmail keeps its 32dp visual offset.
+            // Move Gmail left so the Gmail→Microsoft distance
+            // matches the Microsoft→Home distance.
             winXGmailButton.translationX =
-                dpToPx(32).toFloat()
+                dpToPx(20).toFloat()
 
         } else {
             // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
