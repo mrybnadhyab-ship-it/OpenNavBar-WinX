@@ -1109,7 +1109,7 @@ addView(
             // Final visual balance: move Microsoft 12dp closer to Home.
             // Gmail remains unchanged.
             winXMicrosoftButton.translationX =
-                dpToPx(63).toFloat()
+                dpToPx(75).toFloat()
             winXGmailButton.translationX =
                 dpToPx(32).toFloat()
 
