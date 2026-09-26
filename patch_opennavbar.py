@@ -1104,10 +1104,9 @@ addView(
             )
 
             // Swapped direction: Home is to the right.
-            // Keep Microsoft in its Home-side position and move Gmail
-            // 32dp toward Home, making the Microsoft <-> Gmail spacing
-            // exactly 32dp.
-            winXMicrosoftButton.translationX = 0f
+            // Move Microsoft 29dp toward Home only.
+            winXMicrosoftButton.translationX =
+                dpToPx(29).toFloat()
             winXGmailButton.translationX =
                 dpToPx(32).toFloat()
 
