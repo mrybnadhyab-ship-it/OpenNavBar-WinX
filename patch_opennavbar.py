@@ -1066,14 +1066,21 @@ addView(
             // Recent | Clock | ShowHidden | Gmail | SPACE | Microsoft | Home | Search | Back
             // Search is inserted immediately before Back, so it remains between
             // Home and Back in the opposite/rotated direction.
+            // Give Gmail a real physical LEFT margin so its layout slot moves
+            // away from Microsoft. This changes the actual LinearLayout spacing
+            // instead of using translationX. The weighted SPACE shrinks, so
+            // Microsoft and Home remain in their existing positions.
+            val winXGmailParams = LinearLayout.LayoutParams(
+                dpToPx(32),
+                dpToPx(32),
+                0f
+            ).apply {
+                leftMargin = dpToPx(8)
+            }
             container.addView(
                 winXGmailButton,
                 2,
-                LinearLayout.LayoutParams(
-                    dpToPx(32),
-                    dpToPx(32),
-                    0f
-                )
+                winXGmailParams
             )
             container.addView(
                 winXMicrosoftButton,
@@ -1104,10 +1111,8 @@ addView(
             )
 
             // Swapped direction: Home is to the right.
-            // Gmail must move LEFT, away from Microsoft.
+            // Gmail is separated from Microsoft by a real LEFT margin.
             // Target: Gmail→Microsoft = Microsoft→Home.
-            // The measured difference is approximately 21dp.
-            // Apply the final visual offset after layout below.
 
         } else {
             // Back | Search | Home | Microsoft | Gmail | SPACE | ShowHidden | Clock | Recent
@@ -1155,16 +1160,6 @@ addView(
             winXGmailButton.translationX = 0f
 
         // WINX_SHOW_HIDDEN_ICONS_PATCH_END
-        }
-
-        // FORCE GMAIL AWAY FROM MICROSOFT
-        // Apply after layout so the translation is not overwritten.
-        // Microsoft and Home stay exactly where they are.
-        if (shouldSwap) {
-            winXGmailButton.post {
-                winXGmailButton.translationX =
-                    -dpToPx(21).toFloat()
-            }
         }
 
         // WINX_GMAIL_POSITION_PATCH_END
