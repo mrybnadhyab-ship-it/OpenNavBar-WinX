@@ -1126,8 +1126,8 @@ addView(
                 winXMicrosoftButton,
                 2,
                 LinearLayout.LayoutParams(
-                    dpToPx(32),
-                    dpToPx(32),
+                    dpToPx(25),
+                    dpToPx(25),
                     0f
                 )
             )
