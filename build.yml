@@ -1,45 +1,36 @@
-name: Build OpenNavBar WinX
+name: Build OpenNavBar WinX edition
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout official OpenNavBar source
         uses: actions/checkout@v4
+        with:
+          repository: ItsZariep/OpenNavBar
+          ref: main
+          path: opennavbar
 
-      - name: Set up Java
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Apply Win X auto-hide modification
+        run: python3 patch_opennavbar.py opennavbar/app/src/main/java/com/zariep/opennavbar/NavigationOverlayService.kt
 
-      - name: Install Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10'
-
-      - name: Download OpenNavBar source
-        run: |
-          git clone --depth 1 https://github.com/BigBrotherTech/OpenNavBar.git opennavbar
-
-      - name: Apply WinX patch
-        run: |
-          python3 patch_opennavbar.py
-
-      - name: Build
+      - name: Build debug APK
         working-directory: opennavbar
-        run: gradle assembleDebug --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: OpenNavBar-WinX-debug
-          path: opennavbar/**/build/outputs/apk/debug/*.apk
+          path: opennavbar/app/build/outputs/apk/debug/*.apk
